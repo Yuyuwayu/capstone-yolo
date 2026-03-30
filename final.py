@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import cv2
 
 # Load model yang sudah dilatih
-model = YOLO('runs/detect/train6/weights/best.pt')  # Ganti path sesuai model kamu
+model = YOLO('runs/detect/train10/weights/best.pt')  # Ganti path sesuai model kamu
 
 # Buka video input
 video_path = 1 # Ganti dengan path video kamu

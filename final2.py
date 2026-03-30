@@ -5,21 +5,26 @@ from scipy.spatial.distance import pdist
 from collections import deque
 
 # ==== Konfigurasi ====
-model_path = "runs/detect/train3/weights/best.pt"  # model YOLOv8 yang sudah dilatih
-video_path = "videos/WIN_20250624_21_23_57_Pro.mp4"       # path ke video
-distance_threshold = 300                            # ambang rata-rata jarak antar ikan
-conf_threshold = 0.5                                # confidence minimal untuk deteksi
-history_length = 10                                 # jumlah frame untuk rata-rata status
+model_path = "runs/detect/train/weights/best.pt"  # model YOLOv8 yang sudah dilatih
+# ip = "192.168.1.7"
+# port = 4747
+distance_threshold = 300
+conf_threshold = 0.5
+history_length = 10
 
 # ==== Load Model ====
 model = YOLO(model_path)
-cap = cv2.VideoCapture(video_path)
+# cap = cv2.VideoCapture(f"http://{ip}:{port}/video")  # stream DroidCam
+cap = cv2.VideoCapture(1)
+if not cap.isOpened():
+    print("❌ Gagal membuka stream dari DroidCam. Pastikan HP dan PC 1 jaringan dan DroidCam berjalan.")
 
-status_history = deque(maxlen=history_length)  # simpan status-status terakhir
+status_history = deque(maxlen=history_length)
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
+        print("⚠️ Tidak bisa membaca frame dari stream.")
         break
 
     results = model(frame)[0]
@@ -29,7 +34,7 @@ while cap.isOpened():
         if box.conf < conf_threshold:
             continue
         cls = int(box.cls)
-        if cls != 0:  # class ikan = 0
+        if cls != 0:
             continue
 
         x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -48,7 +53,6 @@ while cap.isOpened():
         cv2.putText(frame, f"Avg Dist: {avg_dist:.2f}", (10, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
-    # Update history dan hitung mayoritas status
     status_history.append(current_status)
     if status_history.count("LAPAR") > len(status_history) // 2:
         status = "LAPAR"
@@ -59,7 +63,7 @@ while cap.isOpened():
     cv2.putText(frame, f"Ikan {status}", (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 3)
 
-    cv2.imshow("Deteksi Nafsu Makan Ikan", frame)
+    cv2.imshow("Deteksi Nafsu Makan Ikan (DroidCam)", frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 

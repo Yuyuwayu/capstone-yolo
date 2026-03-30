@@ -1,0 +1,38 @@
+# venv
+venv/
+.venv/
+
+# python
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+
+# logs
+*.log
+*.txt
+!requirements.txt
+
+# training
+runs/
+
+# dataset
+train/
+valid/
+test/
+
+# media
+*.png
+*.jpg
+*.jpeg
+*.mp4
+
+# model
+*.pt
+*.pth
+
+# OS
+.DS_Store
+Thumbs.db
