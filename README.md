@@ -1,125 +1,171 @@
-﻿# Deteksi Nafsu Makan Ikan Berdasarkan Perilaku Menggunakan YOLOv8
+﻿# 🐟 Deteksi Nafsu Makan Ikan Berdasarkan Perilaku (YOLOv8)
 
-Proyek ini adalah sistem cerdas untuk memantau nafsu makan ikan secara otomatis dengan menganalisis perilaku gerombolan (*schooling behavior*) menggunakan deteksi objek YOLOv8. Sistem menyimpulkan bahwa ikan yang lapar cenderung menyebar (jarak antar ikan jauh), sedangkan ikan yang kenyang akan bergerombol (jarak antar ikan dekat).
+Sistem cerdas untuk memantau nafsu makan ikan secara otomatis melalui analisis perilaku gerombolan (*schooling behavior*). Proyek ini memanfaatkan **YOLOv8** untuk mendeteksi posisi ikan dan menghitung jarak rata-rata antar individu sebagai indikator status lapar.
 
-Analisis ini dilakukan secara *real-time* dari sumber video, dan hasilnya disajikan melalui API serta live video stream.
+> **Logika Utama**: Ikan yang lapar cenderung menyebar (jarak jauh), sedangkan ikan yang kenyang cenderung bergerombol (jarak dekat).
 
-##  workflow Proyek
+## 🔄 Alur Kerja Sistem
 
-Sistem ini bekerja melalui beberapa tahapan utama, mulai dari persiapan data hingga penyajian hasil secara *real-time*.
-
-1.  **Ekstraksi Frame**: Gambar-gambar individual diekstraksi dari video sumber menggunakan `extract.py`.
-2.  **Pemisahan Dataset**: Gambar dibagi secara acak menjadi set data latih (80%) dan validasi (20%) menggunakan `auto.py`.
-3.  **Anotasi Gambar**: Lokasi ikan ditandai pada setiap gambar. Proyek ini menyediakan dua metode:
-    * **Otomatis**: Menggunakan `labeling.py` yang mendeteksi kontur objek.
-    * **Semi-otomatis**: Menggunakan `labeling_manual.py`, sebuah alat bantu grafis untuk menambah, menghapus, atau memperbaiki *bounding box* secara manual.
-4.  **Pelatihan Model**: Model YOLOv8 dilatih dengan dataset yang telah dianotasi untuk mengenali objek 'ikan'.
-5.  **Deteksi & Analisis**: Model yang telah dilatih digunakan untuk mendeteksi ikan dari sumber video. Jarak rata-rata antara semua ikan yang terdeteksi dihitung. Status **"LAPAR"** diberikan jika jarak rata-rata di bawah ambang batas, dan **"Tidak Lapar"** jika sebaliknya.
-6.  **Penyajian Hasil**: Hasil deteksi dapat diakses melalui:
-    * **REST API**: Endpoint yang menyediakan status deteksi, jarak rata-rata, dan gambar dalam format base64.
-    * **Video Stream**: Endpoint untuk streaming video hasil deteksi secara langsung di browser.
-    * **Jendela Pratinjau**: Menampilkan video dengan anotasi secara langsung di jendela desktop.
+1.  **Data Preparation**: Ekstraksi frame (`extract.py`) dan pembagian dataset (`auto.py`).
+2.  **Labeling**: Anotasi otomatis (`labeling.py`) atau manual (`labeling_manual.py`).
+3.  **Training**: Pelatihan model YOLOv8 untuk mengenali objek 'ikan'.
+4.  **Analysis**: Menghitung jarak rata-rata antar ikan secara *real-time*.
+5.  **Output**: Hasil disajikan via **FastAPI** (REST API & Video Stream) atau jendela pratinjau desktop.
 
 ## ✨ Fitur Utama
 
 * **Deteksi Objek Cepat**: Menggunakan arsitektur YOLOv8 yang modern untuk deteksi ikan secara *real-time*.
-* **Analisis Perilaku**: Mengukur jarak rata-rata antar ikan sebagai indikator utama nafsu makan.
-* **Anotasi Semi-Otomatis**: Alat bantu untuk mempercepat proses pelabelan data dengan antarmuka manual yang interaktif.
-* **API & Streaming**: Dibangun dengan FastAPI untuk menyediakan endpoint API dan streaming video, memudahkan integrasi dengan sistem lain.
-* **Sumber Fleksibel**: Dapat menggunakan input dari webcam, file video, atau stream video jaringan.
+* **Analisis Perilaku**: Mengukur jarak rata-rata antar ikan sebagai indikator utama.
+* **Anotasi Semi-Otomatis**: Alat bantu pelabelan data manual yang interaktif.
+* **API & Streaming**: Dibangun dengan FastAPI untuk kemudahan integrasi.
+* **Manajemen Dependensi Modern**: Menggunakan Poetry dan pyenv untuk menjamin konsistensi *environment* lintas OS.
 
-## 📁 Deskripsi File
+## 🛠️ Prasyarat & Lingkungan Pengembangan
 
-| Nama File | Deskripsi |
-| :--- | :--- |
-| **`main.py`** | Aplikasi utama berbasis FastAPI yang menjalankan server untuk API (`/deteksi`) dan live stream video (`/video_feed`). |
-| **`extract.py`** | Mengekstrak frame dari file video dengan interval waktu yang bisa diatur (misalnya, satu frame per detik). |
-| **`auto.py`** | Memisahkan dataset gambar secara acak ke dalam folder `train` dan `val` dengan rasio 80:20. |
-| **`labeling.py`** | Melakukan anotasi (pelabelan) gambar secara otomatis menggunakan metode Computer Vision seperti thresholding dan contour detection. |
-| **`labeling_manual.py`** | Menyediakan antarmuka grafis untuk anotasi manual. Pengguna dapat menggambar, menghapus, dan menavigasi antar gambar. |
-| **`final.py`** | Skrip untuk menjalankan inferensi model pada video dan menyimpan hasilnya sebagai file video baru (`video_output.mp4`). |
-| **`final2.py`** | Skrip inferensi yang lebih canggih, fokus pada analisis jarak antar ikan untuk menentukan status "Lapar" atau "Tidak Lapar". |
-| **`testing camera.py`** | Utilitas sederhana untuk memeriksa indeks kamera yang tersedia dan terdeteksi oleh sistem. |
+Proyek ini dikelola menggunakan **pyenv** dan **Poetry** untuk menjamin konsistensi *environment* secara absolut.
 
-## ⚙️ Prasyarat
+* **Python Version**: 3.13.7 (Dikelola via `pyenv`)
+* **Dependency Manager**: Poetry (Menggunakan `pyproject.toml` dan `poetry.lock`)
+* **Hardware Minimum**: AMD Ryzen 5 5500U / 16GB RAM (atau setara).
 
-* Python 3.8+
-* Pustaka Python: `fastapi`, `uvicorn`, `ultralytics`, `opencv-python`, `numpy`, `scipy`.
+## 🧰 Instalasi Prasyarat Dasar (Jika Belum Memiliki)
 
-## 🚀 Instalasi
+Jika komputer Anda belum memiliki **pyenv** dan **Poetry**, ikuti panduan singkat ini sesuai dengan Sistem Operasi Anda sebelum melanjutkan ke tahap instalasi proyek.
 
-1.  **Clone Repositori**
-    ```bash
-    git clone https://github.com/Yuyuwayu/capstone-yolo.git
-    cd nama-repositori
-    ```
+### A.Instalasi pyenv (Manajer Versi Python)
 
-2.  **Buat Virtual Environment (Sangat Disarankan)**
-    ```bash
-    python -m venv venv
-    # Windows
-    .\venv\Scripts\activate
-    # macOS/Linux
-    source venv/bin/activate
-    ```
+**Untuk Pengguna Windows 11:**
+1. Buka PowerShell (sebagai Administrator).
+2. Jalankan perintah instalasi berikut:
+   ```powershell
+   Invoke-WebRequest -UseBasicParsing -Uri "[https://raw.githubusercontent.com/pyenv-win/pyenv-win/master/pyenv-win/install-pyenv-win.ps1](https://raw.githubusercontent.com/pyenv-win/pyenv-win/master/pyenv-win/install-pyenv-win.ps1)" -OutFile "./install-pyenv-win.ps1"; &"./install-pyenv-win.ps1"
+   ```
+3. Penting (Hanya Windows): Buka Settings > Apps > Advanced app settings > App execution aliases, lalu matikan (Off) untuk App Installer (python.exe dan python3.exe) agar tidak bentrok dengan Microsoft Store.
 
-3.  **Instal Dependensi**
-    ```bash
-    pip install fastapi uvicorn "ultralytics[cv2]" numpy scipy
-    ```
+**Untuk Pengguna Linux (Ubuntu/Arch) & macOS:**
+```bash
+# Arch Linux (via AUR)
+yay -S pyenv
 
-4.  **Siapkan Model**
-    Pastikan Anda memiliki file bobot model YOLOv8 yang telah dilatih (misalnya `best.pt`). Letakkan di dalam direktori yang sesuai seperti `runs/detect/train3/weights/`.
+# Ubuntu / Linux Lainnya (via Curl)
+curl [https://pyenv.run](https://pyenv.run) | bash
+```
+(Jangan lupa tambahkan pyenv ke dalam file .bashrc atau .zshrc Anda sesuai instruksi di terminal).
+
+### B. Instalasi Poetry (Manajer Dependensi)
+Sangat disarankan menginstal Poetry secara independen (bukan melalui pip biasa).
+
+**Untuk Pengguna Windows 11:**
+Buka PowerShell dan jalankan:
+```PowerShell
+(Invoke-WebRequest -Uri [https://install.python-poetry.org](https://install.python-poetry.org) -UseBasicParsing).Content | py -
+```
+
+(Pastikan Anda menambahkan path C:\Users\<NamaUser>\AppData\Roaming\Python\Scripts ke dalam Environment Variables PATH Windows Anda).
+
+**Untuk Pengguna Linux & macOS:**
+Buka terminal dan jalankan:
+```bash
+curl -sSL [https://install.python-poetry.org](https://install.python-poetry.org) | python3 -
+```
+## 📥 Instalasi dari Nol (Replikasi Environment)
+
+Proyek ini menggunakan **Poetry** untuk memastikan seluruh dependensi (*library*) beserta versi persisnya terkunci dengan rapi. Ini menghindari masalah "di laptop saya jalan, kok di sini error?" saat berpindah *device* atau berkolaborasi.
+
+Ikuti langkah-langkah di bawah ini untuk mereplikasi *environment* proyek secara identik:
+
+### 1. Clone Repositori
+Tarik kode dari GitHub dan masuk ke dalam folder proyek.
+```bash
+git clone [https://github.com/Yuyuwayu/capstone-yolo.git](https://github.com/Yuyuwayu/capstone-yolo.git)
+cd capstone-yolo 
+```
+
+### Setup Versi Python (via pyenv)
+Karena library Machine Learning sangat sensitif terhadap versi Python, proyek ini dikunci menggunakan Python 3.13.7.
+Pastikan utilitas pyenv (atau pyenv-win untuk Windows) sudah terpasang di sistem Anda, lalu jalankan:
+```bash
+# Instal versi Python yang dibutuhkan
+pyenv install 3.13.7
+
+# Kunci versi tersebut HANYA untuk folder proyek ini
+pyenv local 3.13.7
+```
+
+### 3. Inisialisasi dan Instalasi Dependensi (via Poetry)
+Sekarang, instruksikan Poetry untuk menggunakan versi Python yang telah disiapkan di atas, lalu biarkan Poetry mengunduh dan menyusun virtual environment berdasarkan file poetry.lock.
+```bash
+# Beritahu Poetry untuk memakai Python 3.13.7
+poetry env use 3.13.7
+
+# Mulai proses instalasi (otomatis membaca poetry.lock)
+poetry install
+```
+> Penting: Konfigurasi pyproject.toml pada proyek ini telah diatur dengan batas python = ">=3.13, <3.14" untuk mengatasi isu inkompatibilitas instalasi pada library torchvision.
+
+### 4. Siapkan Model (Weights)
+Pastikan Anda memiliki file bobot model YOLOv8 hasil pelatihan (misalnya best.pt). Secara default, letakkan file tersebut di dalam direktori yang diminta oleh script (contoh: runs/detect/train3/weights/best.pt).
 
 ## 🎮 Panduan Penggunaan
 
-### 1. Persiapan Data (Jika Melatih Ulang)
+Karena proyek ini dibungkus secara aman menggunakan Poetry, **selalu tambahkan awalan `poetry run`** sebelum mengeksekusi skrip Python apa pun dari terminal. 
+*(Alternatif: Anda bisa mengetik `poetry shell` terlebih dahulu untuk masuk ke dalam environment, lalu menjalankan skrip secara normal tanpa awalan).*
 
-1.  **Kumpulkan Video**: Simpan file video Anda di dalam folder `videos/`.
-2.  **Ekstrak Frame**: Jalankan skrip `extract.py`.
+### 1. Persiapan Data (Jika Ingin Melatih Ulang)
+
+1.  **Siapkan Video**: Masukkan file video ikan Anda ke dalam folder `videos/`.
+2.  **Ekstrak Frame Video**: 
     ```bash
-    python extract.py
+    poetry run python extract.py
     ```
-3.  **Bagi Dataset**: Jalankan `auto.py` untuk membuat set data latih dan validasi.
+3.  **Pisahkan Dataset (Train/Val)**: 
     ```bash
-    python auto.py
+    poetry run python auto.py
     ```
-4.  **Anotasi Gambar**: Gunakan `labeling_manual.py` untuk anotasi yang lebih akurat.
+4.  **Anotasi Bounding Box**: 
+    Gunakan alat bantu interaktif kami untuk memperbaiki kotak pelabelan.
     ```bash
-    python labeling_manual.py
+    poetry run python labeling_manual.py
     ```
-    **Kontrol Manual:**
-    * `s`: Simpan anotasi & lanjut ke gambar berikutnya.
-    * `n`: Lanjut tanpa menyimpan.
-    * `p`: Kembali ke gambar sebelumnya.
-    * `h`: Beralih antara mode Tambah dan Hapus.
-    * `q` atau `Esc`: Keluar.
+    *(Kontrol Keyboard: `s` simpan & lanjut, `n` lewati, `p` kembali, `h` ganti mode Tambah/Hapus, `q` atau `Esc` untuk keluar).*
 
-### 2. Pelatihan Model
+### 2. Pelatihan Model (Training)
 
-Gunakan `ultralytics` untuk melatih model Anda. Pastikan file konfigurasi dataset (`.yaml`) sudah benar.
+Gunakan perintah bawaan Ultralytics untuk memulai proses *training*. Pastikan file `data.yaml` sudah dikonfigurasi dengan *path* yang benar menuju folder dataset Anda.
 ```bash
-yolo task=detect mode=train model=yolov8n.pt data=path/to/data.yaml epochs=100 imgsz=640
+poetry run yolo task=detect mode=train model=yolov8n.pt data=path/to/data.yaml epochs=100 imgsz=640
 ```
+### 3. Eksekusi Program Utama
 
-### 3. Menjalankan Aplikasi
+Sistem ini menyediakan dua antarmuka untuk melihat hasil deteksi nafsu makan ikan:
 
-#### a. Menjalankan Server API dan Streaming
-
-Untuk menjalankan server utama, gunakan `uvicorn`.
-
+**A. Melalui Server API & Live Stream (FastAPI)**
+Cocok untuk diintegrasikan dengan web atau aplikasi *mobile*.
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+poetry run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
-Endpoint yang tersedia:
-* **API Status**: `http://127.0.0.1:8000/deteksi`
-* **Video Stream**: `http://127.0.0.1:8000/video_feed`
+* Cek Status (JSON): Buka http://127.0.0.1:8000/deteksi
+* Live Video Stream: Buka http://127.0.0.1:8000/video_feed
 
-#### b. Menjalankan Deteksi pada File Video
-
-Untuk memproses file video lokal dan menampilkan hasilnya, gunakan `final2.py`.
+**B. Melalui Pratinjau Desktop (Real-time Window)**
+Cocok untuk pengujian cepat dan melihat analisis jarak antar ikan (schooling behavior) langsung di layar monitor.
 ```bash
-python final2.py
+poetry run python final2.py
 ```
+> (Tekan tombol q pada keyboard kapan saja untuk menghentikan pemutaran video).
+## 📁 Deskripsi File Utama
 
-Tekan `q` untuk menghentikan pemutaran video.
+Berikut adalah kompas untuk navigasi struktur kode dalam proyek ini:
+
+| Nama File / Folder | Deskripsi Fungsi |
+| :--- | :--- |
+| **`main.py`** | Aplikasi web FastAPI (menyediakan API endpoint dan *video feed*). |
+| **`final2.py`** | Mesin deteksi utama; menganalisis *bounding box* dan menghitung jarak Euclidean antar ikan untuk penentuan status lapar. |
+| **`final.py`** | Skrip alternatif untuk menjalankan inferensi model pada video dan menyimpan hasilnya sebagai file `.mp4` baru. |
+| **`extract.py`** | Utilitas pemotong video menjadi ribuan gambar frame (Dataset *builder*). |
+| **`auto.py`** | *Script* pembagi rasio data latih (80%) dan data validasi (20%) secara acak. |
+| **`labeling.py`** | Melakukan anotasi (pelabelan) gambar secara otomatis menggunakan metode Computer Vision (kontur & *thresholding*). |
+| **`labeling_manual.py`**| GUI (*Graphical User Interface*) interaktif untuk proses anotasi data secara manual (tambah/hapus *bounding box*). |
+| **`testing camera.py`**| Utilitas sederhana untuk memeriksa indeks kamera webcam yang tersedia dan terdeteksi oleh sistem. |
+| **`pyproject.toml`** | "Jantung" proyek; mendefinisikan versi Python (3.13.x) dan seluruh pustaka yang digunakan oleh Poetry. |
+| **`poetry.lock`** | Gembok versi; menyimpan kode *hash* presisi dari setiap dependensi untuk di-*clone* ke PC atau OS lain tanpa *error*. |

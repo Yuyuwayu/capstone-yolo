@@ -1,0 +1,23 @@
+[project]
+name = "capstone-yolo"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Yuyuwayu",email = "simpersherta@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13, <3.14"
+dependencies = [
+    "ultralytics (>=8.4.37,<9.0.0)",
+    "torch (>=2.11.0,<3.0.0)",
+    "torchvision (>=0.26.0,<0.27.0)",
+    "opencv-python (>=4.13.0.92,<5.0.0.0)",
+    "polars (>=1.39.3,<2.0.0)",
+    "matplotlib (>=3.10.8,<4.0.0)",
+    "scipy (>=1.17.1,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
