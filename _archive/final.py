@@ -5,7 +5,7 @@ import cv2
 model = YOLO('runs/detect/train10/weights/best.pt')  # Ganti path sesuai model kamu
 
 # Buka video input
-video_path = 1 # Ganti dengan path video kamu
+video_path = "2.mp4" # Ganti dengan path video kamu
 cap = cv2.VideoCapture(video_path)
 
 # Ambil detail video (resolusi, fps, dll)

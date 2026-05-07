@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="FishWatch — Fish Hunger Detection Dashboard with YOLOv8" />
+  <title>FishWatch</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ═══ NAV ═══ -->
+  <nav class="nav" id="main-nav">
+    <a href="#" class="nav-logo">FishWatch</a>
+    <div class="flex items-center gap-lg">
+      <button class="nav-tab active" data-page="monitor">Monitor</button>
+      <button class="nav-tab" data-page="dataset">Dataset</button>
+      <button class="nav-tab" data-page="training">Training</button>
+      <button class="nav-tab" data-page="models">Models</button>
+    </div>
+    <div class="nav-env" id="nav-env">
+      <span class="dot dot-ok" id="env-dot"></span>
+      <span id="env-label">Checking…</span>
+    </div>
+  </nav>
+
+  <main class="container">
+
+    <!-- ═══ SETUP PAGE ═══ -->
+    <section class="page" id="page-setup">
+      <div class="setup-center">
+        <div class="card setup-card fade-in">
+          <h1 style="margin-bottom:var(--sp-sm)">Setup</h1>
+          <p class="t-label" style="margin-bottom:var(--sp-lg)">Checking environment</p>
+
+          <div id="setup-packages"></div>
+          <hr class="divider" />
+          <p class="t-label" style="margin-bottom:var(--sp-sm)">Directories</p>
+          <div id="setup-dirs"></div>
+
+          <div class="flex gap-md" style="margin-top:var(--sp-lg)">
+            <button class="btn btn-primary" id="btn-install">Install Missing</button>
+            <button class="btn btn-outline" id="btn-recheck">Re-check</button>
+          </div>
+
+          <div id="install-log-wrap" style="display:none;margin-top:var(--sp-lg)">
+            <p class="t-label" style="margin-bottom:var(--sp-sm)">Install Log</p>
+            <div class="terminal" id="install-log"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ MONITOR PAGE ═══ -->
+    <section class="page" id="page-monitor">
+      <div class="grid-2 fade-in" style="grid-template-columns:3fr 2fr">
+        <!-- Left: Video -->
+        <div>
+          <div class="video-container" id="video-container">
+            <span class="video-label">Live Feed</span>
+            <div class="video-placeholder" id="video-placeholder">
+              <span style="font-size:2.5rem;opacity:0.3">📷</span>
+              <span style="font-size:0.8125rem;color:var(--secondary)">Select a source and press Start Stream</span>
+            </div>
+            <img id="video-feed" alt="Video feed" style="display:none" />
+            <!-- Hidden: browser camera elements -->
+            <video id="browser-cam-video" autoplay playsinline style="display:none"></video>
+            <canvas id="browser-cam-canvas" style="display:none"></canvas>
+          </div>
+          <div class="flex gap-md flex-wrap items-center" style="margin-top:var(--sp-md)">
+            <button class="btn btn-primary btn-sm" id="btn-stream-start">Start Stream</button>
+            <button class="btn btn-outline btn-sm" id="btn-stream-stop">Stop</button>
+            <div class="form-group">
+              <label class="form-label">Source</label>
+              <select class="form-select" id="monitor-source-type">
+                <optgroup label="Detecting webcams…" id="cam-optgroup">
+                </optgroup>
+                <option value="browser-cam">📱 Browser Camera</option>
+                <option value="droidcam">DroidCam (IP)</option>
+                <option value="video-file">📁 Video File</option>
+              </select>
+            </div>
+            <!-- DroidCam IP field -->
+            <div class="form-group" id="source-extra-wrap" style="display:none">
+              <label class="form-label" id="source-extra-label">IP Address</label>
+              <input class="form-input" id="monitor-source-extra" placeholder="192.168.1.7:4747" />
+            </div>
+            <!-- Video file browse -->
+            <div class="form-group" id="video-upload-wrap" style="display:none">
+              <input type="file" id="video-upload-input" accept="video/*" style="display:none" />
+              <button class="btn btn-outline btn-sm" id="btn-video-browse">Browse…</button>
+              <span class="t-mono t-secondary" id="video-file-name" style="font-size:0.6875rem"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Status + Stats -->
+        <div class="flex flex-col gap-md">
+          <!-- Status + Stats (merged) -->
+          <div class="card">
+            <div class="flex items-center justify-between" style="margin-bottom:var(--sp-sm)">
+              <p class="t-label">Status</p>
+              <p class="status-text" id="status-text" style="margin:0">—</p>
+            </div>
+            <hr class="divider" style="margin:var(--sp-xs) 0" />
+            <div class="stat-row">
+              <span class="stat-label">Detected</span>
+              <span class="stat-value" id="stat-count">—</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Avg Distance</span>
+              <span class="stat-value" id="stat-dist">—</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Updated</span>
+              <span class="stat-value" id="stat-time">—</span>
+            </div>
+          </div>
+
+          <!-- Settings (compact) -->
+          <div class="card-compact">
+            <div class="grid-2" style="gap:var(--sp-md)">
+              <div class="form-group">
+                <div class="flex justify-between">
+                  <label class="form-label">Threshold</label>
+                  <span class="t-mono t-secondary" id="threshold-val">300</span>
+                </div>
+                <input type="range" class="slider" id="slider-threshold" min="50" max="800" value="300" />
+              </div>
+              <div class="form-group">
+                <div class="flex justify-between">
+                  <label class="form-label">Confidence</label>
+                  <span class="t-mono t-secondary" id="conf-val">0.50</span>
+                </div>
+                <input type="range" class="slider" id="slider-conf" min="10" max="95" value="50" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Model + Chart side by side -->
+          <div class="card-compact">
+            <div class="form-group" style="margin-bottom:var(--sp-sm)">
+              <label class="form-label">Active Model</label>
+              <select class="form-select" id="monitor-model"></select>
+            </div>
+          </div>
+
+          <div class="card-compact">
+            <p class="t-label" style="margin-bottom:var(--sp-xs)">Distance Trend</p>
+            <div class="chart-container">
+              <canvas id="chart-trend"></canvas>
+            </div>
+          </div>
+
+          <!-- Detection Log (inside right column) -->
+          <div class="card-compact">
+            <p class="t-label" style="margin-bottom:var(--sp-xs)">Detection Log</p>
+            <div class="log-strip" id="detection-log">
+              <div class="empty-state" style="padding:var(--sp-md)"><p>No detections yet.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ DATASET PAGE ═══ -->
+    <section class="page" id="page-dataset">
+      <div class="fade-in">
+        <!-- Toolbar -->
+        <div class="toolbar" id="dataset-toolbar">
+          <div class="form-group">
+            <label class="form-label">Dataset</label>
+            <select class="form-select" id="ds-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Split</label>
+            <select class="form-select" id="ds-split"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Filter</label>
+            <select class="form-select" id="ds-filter">
+              <option value="all">All</option>
+              <option value="annotated">Annotated</option>
+              <option value="unannotated">Unannotated</option>
+            </select>
+          </div>
+          <div class="toolbar-stats" id="ds-stats">—</div>
+        </div>
+
+        <!-- Gallery -->
+        <div class="section" style="margin-top:var(--sp-lg)">
+          <div class="gallery" id="ds-gallery"></div>
+        </div>
+
+        <!-- Preview -->
+        <div class="section" id="ds-preview-section" style="display:none">
+          <div class="preview-header">
+            <p class="t-label">Preview — <span id="ds-preview-name"></span></p>
+            <button class="btn btn-danger btn-sm" id="btn-preview-delete">Delete this image</button>
+          </div>
+          <div class="preview-panel">
+            <div>
+              <p class="t-label" style="margin-bottom:var(--sp-xs)">Original</p>
+              <img id="ds-preview-orig" alt="Original" />
+            </div>
+            <div>
+              <p class="t-label" style="margin-bottom:var(--sp-xs)">Annotated</p>
+              <img id="ds-preview-annot" alt="Annotated" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-md flex-wrap items-end" style="margin-top:var(--sp-lg)">
+          <div class="form-group">
+            <label class="form-label">Import Images (auto-splits to train/val)</label>
+            <div class="flex gap-sm items-center flex-wrap">
+              <input type="file" id="ds-import-files" accept="image/*" multiple style="display:none" />
+              <input type="file" id="ds-import-folder" webkitdirectory multiple style="display:none" />
+              <button class="btn btn-primary btn-sm" id="btn-import">Files…</button>
+              <button class="btn btn-outline btn-sm" id="btn-import-folder">Folder…</button>
+              <span class="t-mono t-secondary" id="ds-import-status" style="font-size:0.6875rem"></span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Train / Val Ratio</label>
+            <div class="flex gap-sm items-center">
+              <input type="range" class="slider" id="ds-split-ratio" min="50" max="95" value="80" style="width:120px" />
+              <span class="t-mono t-secondary" id="ds-ratio-val">80/20</span>
+            </div>
+          </div>
+
+          <button class="btn btn-danger btn-sm" id="btn-ds-delete" style="display:none">
+            Delete Selected (<span id="ds-sel-count">0</span>)
+          </button>
+
+          <button class="btn btn-danger btn-sm" id="btn-ds-delete-split" style="margin-left:auto">
+            Delete Entire Split
+          </button>
+        </div>
+
+        <!-- Merge Datasets -->
+        <div class="merge-section" style="margin-top:var(--sp-lg)">
+          <div style="display:flex;align-items:center;gap:var(--sp-sm);margin-bottom:var(--sp-sm)">
+            <span style="font-size:1.25rem">🔀</span>
+            <p class="t-label" style="margin:0">Merge Datasets</p>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--secondary);margin-bottom:var(--sp-md)">Combine images & labels from multiple datasets into one for training.</p>
+          <div style="display:flex;gap:var(--sp-md);align-items:flex-end;flex-wrap:wrap">
+            <div class="form-group" style="flex:1;min-width:200px">
+              <label class="form-label">Select Sources</label>
+              <div id="merge-checkboxes" class="flex gap-sm flex-wrap" style="margin-top:4px"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target Name</label>
+              <input class="form-input" id="merge-name" placeholder="merged" value="merged" style="width:140px" />
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--sp-sm)">
+              <button class="btn btn-outline btn-sm" id="btn-merge">Merge →</button>
+              <span class="t-mono t-secondary" id="merge-status" style="font-size:0.6875rem"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ TRAINING PAGE ═══ -->
+    <section class="page" id="page-training">
+      <div class="fade-in">
+        <h2 style="margin-bottom:var(--sp-lg)">Training</h2>
+
+        <!-- Config Form -->
+        <div class="card section">
+          <div class="grid-3" style="margin-bottom:var(--sp-md)">
+            <div class="form-group">
+              <label class="form-label">Base Model</label>
+              <select class="form-select" id="tr-model">
+                <option>yolov8n.pt</option>
+                <option>yolov8s.pt</option>
+                <option>yolov8m.pt</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Dataset</label>
+              <select class="form-select" id="tr-dataset"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Device</label>
+              <select class="form-select" id="tr-device">
+                <option value="cpu">CPU</option>
+                <option value="0">GPU 0</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-compact" style="margin-bottom:var(--sp-md)">
+            <p class="t-label" style="margin-bottom:var(--sp-xs)">Detected Classes</p>
+            <div id="tr-classes" class="t-mono" style="font-size:0.8125rem;color:var(--primary)">—</div>
+          </div>
+          <div class="grid-3" style="margin-bottom:var(--sp-lg)">
+            <div class="form-group">
+              <label class="form-label">Epochs</label>
+              <input class="form-input" id="tr-epochs" type="number" value="100" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Batch Size</label>
+              <input class="form-input" id="tr-batch" type="number" value="16" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Image Size</label>
+              <input class="form-input" id="tr-imgsz" type="number" value="640" />
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btn-train-start">Start Training</button>
+        </div>
+
+        <!-- Progress -->
+        <div class="card section" id="training-progress" style="display:none">
+          <div class="flex justify-between items-center" style="margin-bottom:var(--sp-md)">
+            <h2>Training Progress</h2>
+            <span class="t-mono t-secondary" id="tr-epoch-label">0 / 0</span>
+          </div>
+          <div class="progress-track" style="margin-bottom:var(--sp-lg)">
+            <div class="progress-fill" id="tr-progress-bar" style="width:0%"></div>
+          </div>
+          <p class="t-label" style="margin-bottom:var(--sp-sm)">Log</p>
+          <div class="terminal" id="tr-log"></div>
+          <div style="margin-top:var(--sp-md);text-align:right">
+            <button class="btn btn-danger btn-sm" id="btn-train-stop">Stop</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ MODELS PAGE ═══ -->
+    <section class="page" id="page-models">
+      <div class="fade-in">
+        <h2 style="margin-bottom:var(--sp-lg)">Models</h2>
+        <div id="models-list"></div>
+
+        <!-- Curves -->
+        <div class="section" id="curves-section" style="display:none;margin-top:var(--sp-lg)">
+          <p class="t-label" style="margin-bottom:var(--sp-sm)">Training Curves — <span id="curves-model-name"></span></p>
+          <div class="grid-2">
+            <div class="chart-container">
+              <p class="t-label" style="margin-bottom:var(--sp-xs)">mAP50</p>
+              <canvas id="chart-map"></canvas>
+            </div>
+            <div class="chart-container">
+              <p class="t-label" style="margin-bottom:var(--sp-xs)">Loss</p>
+              <canvas id="chart-loss"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Confirm Dialog (hidden) -->
+  <div class="dialog-overlay" id="confirm-dialog" style="display:none">
+    <div class="dialog">
+      <p id="confirm-text">Are you sure?</p>
+      <div class="dialog-actions">
+        <button class="btn btn-outline btn-sm" id="confirm-cancel">Cancel</button>
+        <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
