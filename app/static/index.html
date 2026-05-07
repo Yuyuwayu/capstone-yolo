@@ -170,7 +170,11 @@
         <div class="toolbar" id="dataset-toolbar">
           <div class="form-group">
             <label class="form-label">Dataset</label>
-            <select class="form-select" id="ds-select"></select>
+            <div style="display:flex;gap:var(--sp-xs)">
+              <select class="form-select" id="ds-select"></select>
+              <button class="btn btn-outline btn-sm" id="btn-ds-new" title="New Dataset">+</button>
+              <button class="btn btn-outline btn-sm" id="btn-ds-delete-all" style="color:var(--danger);border-color:var(--danger)" title="Delete Dataset">🗑</button>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Split</label>
@@ -192,21 +196,27 @@
           <div class="gallery" id="ds-gallery"></div>
         </div>
 
-        <!-- Preview -->
+        <!-- Preview & Annotation -->
         <div class="section" id="ds-preview-section" style="display:none">
-          <div class="preview-header">
-            <p class="t-label">Preview — <span id="ds-preview-name"></span></p>
-            <button class="btn btn-danger btn-sm" id="btn-preview-delete">Delete this image</button>
+          <div class="preview-header" style="flex-wrap:wrap;gap:var(--sp-sm)">
+            <div style="display:flex;align-items:center;gap:var(--sp-sm)">
+              <button class="btn btn-outline btn-sm" id="btn-preview-close">← Back</button>
+              <p class="t-label">Annotate — <span id="ds-preview-name"></span></p>
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--sp-sm)">
+              <select class="form-select" id="annot-class-select" style="min-width:120px"></select>
+              <button class="btn btn-outline btn-sm" id="btn-annot-delete-box" style="display:none;color:var(--danger);border-color:var(--danger)">Delete Selected Box</button>
+              <button class="btn btn-outline btn-sm" id="btn-annot-clear">Clear All</button>
+              <button class="btn btn-primary btn-sm" id="btn-annot-save">Save</button>
+              <button class="btn btn-danger btn-sm" id="btn-preview-delete" title="Delete Image">🗑</button>
+            </div>
           </div>
-          <div class="preview-panel">
-            <div>
-              <p class="t-label" style="margin-bottom:var(--sp-xs)">Original</p>
-              <img id="ds-preview-orig" alt="Original" />
-            </div>
-            <div>
-              <p class="t-label" style="margin-bottom:var(--sp-xs)">Annotated</p>
-              <img id="ds-preview-annot" alt="Annotated" />
-            </div>
+          <p style="font-size:0.75rem;color:var(--secondary);margin-bottom:var(--sp-md)">
+            <strong>Drag</strong> to draw a new box. <strong>Click</strong> a box to select it. Press <strong>Delete/Backspace</strong> to remove the selected box.
+          </p>
+          <div class="annot-container" id="annot-container" style="position:relative;width:100%;background:#000;border-radius:var(--rounded-md);overflow:hidden;display:flex;justify-content:center;align-items:center;max-height:650px;">
+            <img id="ds-preview-orig" alt="Original" style="display:none;" />
+            <canvas id="annot-canvas" style="cursor:crosshair;max-width:100%;max-height:100%;height:auto;object-fit:contain;display:block;"></canvas>
           </div>
         </div>
 
@@ -238,6 +248,24 @@
           <button class="btn btn-danger btn-sm" id="btn-ds-delete-split" style="margin-left:auto">
             Delete Entire Split
           </button>
+        </div>
+
+        <!-- Class Management -->
+        <div class="card-compact section" style="margin-top:var(--sp-lg)">
+          <div style="display:flex;align-items:center;gap:var(--sp-sm);margin-bottom:var(--sp-sm)">
+            <span style="font-size:1.25rem">🏷️</span>
+            <p class="t-label" style="margin:0">Manage Classes</p>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--secondary);margin-bottom:var(--sp-md)">Add or remove labels for this dataset. (Comma-separated)</p>
+          <div class="flex gap-md items-end flex-wrap">
+            <div class="form-group" style="flex:1;min-width:200px">
+              <input class="form-input" id="ds-classes-input" placeholder="e.g. ikan, pakan, predator" />
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--sp-sm)">
+              <button class="btn btn-primary btn-sm" id="btn-classes-save">Update Classes</button>
+              <span class="t-mono t-secondary" id="classes-status" style="font-size:0.6875rem"></span>
+            </div>
+          </div>
         </div>
 
         <!-- Merge Datasets -->

@@ -487,6 +487,9 @@ async function initDataset() {
 
   loadImages();
   loadMergeCheckboxes();
+  if (dsState.dataset) {
+    loadClasses();
+  }
 }
 
 function updateSplitOptions(stats) {
@@ -521,6 +524,41 @@ document.getElementById('ds-select').addEventListener('change', (e) => {
   dsState.dataset = e.target.value;
   dsState.selected.clear();
   initDataset();
+});
+
+document.getElementById('btn-ds-new').addEventListener('click', async () => {
+  const name = prompt("Enter new dataset name (alphanumeric and underscores only):");
+  if (!name) return;
+  try {
+    const res = await fetch(API + `/api/dataset/${name}/create`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      dsState.dataset = name;
+      initDataset();
+    } else {
+      alert("Error: " + data.error);
+    }
+  } catch (err) {
+    alert("Failed to create dataset.");
+  }
+});
+
+document.getElementById('btn-ds-delete-all').addEventListener('click', () => {
+  if (!dsState.dataset) return;
+  showConfirm(`Delete entire dataset '${dsState.dataset}'? This cannot be undone!`, async () => {
+    try {
+      const res = await fetch(API + `/api/dataset/${dsState.dataset}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        dsState.dataset = '';
+        initDataset();
+      } else {
+        alert("Error: " + data.error);
+      }
+    } catch {
+      alert("Failed to delete dataset.");
+    }
+  });
 });
 document.getElementById('ds-split').addEventListener('change', (e) => {
   dsState.split = e.target.value;
@@ -602,14 +640,261 @@ function updateDeleteBtn() {
 
 let currentPreviewFile = null;
 
-function previewImage(filename) {
+// ── Annotation Canvas Logic ───────────────────────
+let annotBoxes = [];
+let annotClasses = {};
+
+const canvas = document.getElementById('annot-canvas');
+const ctx = canvas.getContext('2d');
+const imgEl = document.getElementById('ds-preview-orig');
+let isDrawing = false;
+let isDraggingBox = false;
+let dragOffsetX = 0; let dragOffsetY = 0;
+let startX = 0; let startY = 0;
+let currentRect = null;
+let selectedBoxIndex = -1;
+
+const COLORS = ['#b2ba3c', '#3cba5d', '#3c8eba', '#ba3c3c', '#ba3c9e', '#e6a822', '#3cba9b', '#9bba3c'];
+
+async function loadClasses() {
+  try {
+    const res = await fetch(API + `/api/dataset/${dsState.dataset}/classes`);
+    const data = await res.json();
+    annotClasses = {};
+    const select = document.getElementById('annot-class-select');
+    select.innerHTML = '';
+    const classNames = [];
+    data.classes.forEach(c => {
+      annotClasses[c.id] = c.name;
+      classNames.push(c.name);
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = `${c.id}: ${c.name}`;
+      select.appendChild(opt);
+    });
+    document.getElementById('ds-classes-input').value = classNames.join(', ');
+  } catch {}
+}
+
+document.getElementById('btn-classes-save').addEventListener('click', async () => {
+  const val = document.getElementById('ds-classes-input').value;
+  const classes = val.split(',').map(s => s.trim()).filter(s => s);
+  const status = document.getElementById('classes-status');
+  try {
+    await fetch(API + `/api/dataset/${dsState.dataset}/classes`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({classes})
+    });
+    status.textContent = 'Saved!';
+    setTimeout(() => status.textContent='', 2000);
+    loadClasses();
+  } catch {
+    status.textContent = 'Error';
+  }
+});
+
+async function previewImage(filename) {
   currentPreviewFile = filename;
   document.getElementById('ds-preview-section').style.display = 'block';
   document.getElementById('ds-preview-name').textContent = filename;
-  document.getElementById('ds-preview-orig').src = `${API}/api/dataset/${dsState.dataset}/image/${dsState.split}/${filename}`;
-  document.getElementById('ds-preview-annot').src = `${API}/api/dataset/${dsState.dataset}/preview/${dsState.split}/${filename}`;
+  
+  // Load image
+  imgEl.src = `${API}/api/dataset/${dsState.dataset}/image/${dsState.split}/${filename}`;
+  
+  // Load labels
+  const res = await fetch(API + `/api/dataset/${dsState.dataset}/labels/${dsState.split}/${filename}`);
+  const data = await res.json();
+  annotBoxes = data.labels || []; // [[id, xc, yc, w, h]]
+  selectedBoxIndex = -1;
+  updateDeleteBoxBtn();
 }
 
+function updateDeleteBoxBtn() {
+  const btn = document.getElementById('btn-annot-delete-box');
+  if (selectedBoxIndex !== -1) {
+    btn.style.display = 'inline-block';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+// Draw loop
+function drawCanvas() {
+  if (!imgEl.complete || imgEl.naturalWidth === 0) return;
+  canvas.width = imgEl.naturalWidth;
+  canvas.height = imgEl.naturalHeight;
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+  
+  // Draw existing boxes
+  annotBoxes.forEach((box, i) => {
+    const [cid, xc, yc, w, h] = box;
+    const px = (xc - w/2) * canvas.width;
+    const py = (yc - h/2) * canvas.height;
+    const pw = w * canvas.width;
+    const ph = h * canvas.height;
+    
+    ctx.strokeStyle = i === selectedBoxIndex ? '#fff' : (COLORS[cid % COLORS.length] || '#00ff00');
+    ctx.lineWidth = i === selectedBoxIndex ? 4 : 2;
+    ctx.strokeRect(px, py, pw, ph);
+    
+    // Label bg
+    ctx.fillStyle = ctx.strokeStyle;
+    const name = annotClasses[cid] || `cls${cid}`;
+    ctx.font = '24px monospace';
+    const txtWidth = ctx.measureText(name).width;
+    ctx.fillRect(px, py - 30, txtWidth + 10, 30);
+    ctx.fillStyle = '#000';
+    ctx.fillText(name, px + 5, py - 6);
+  });
+  
+  // Draw current rect
+  if (isDrawing && currentRect) {
+    const activeCid = parseInt(document.getElementById('annot-class-select').value) || 0;
+    ctx.strokeStyle = COLORS[activeCid % COLORS.length] || '#00ff00';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(currentRect.x, currentRect.y, currentRect.w, currentRect.h);
+  }
+}
+
+imgEl.onload = drawCanvas;
+window.addEventListener('resize', drawCanvas);
+
+function getCanvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  };
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const pos = getCanvasPos(e);
+  
+  // Check if clicking existing box
+  selectedBoxIndex = -1;
+  for (let i = annotBoxes.length - 1; i >= 0; i--) {
+    const [cid, xc, yc, w, h] = annotBoxes[i];
+    const px = (xc - w/2) * canvas.width;
+    const py = (yc - h/2) * canvas.height;
+    const pw = w * canvas.width;
+    const ph = h * canvas.height;
+    if (pos.x >= px && pos.x <= px+pw && pos.y >= py && pos.y <= py+ph) {
+      selectedBoxIndex = i;
+      isDraggingBox = true;
+      dragOffsetX = pos.x - (xc * canvas.width);
+      dragOffsetY = pos.y - (yc * canvas.height);
+      updateDeleteBoxBtn();
+      drawCanvas();
+      return;
+    }
+  }
+
+  // Otherwise start drawing new box
+  selectedBoxIndex = -1;
+  updateDeleteBoxBtn();
+  isDrawing = true;
+  startX = pos.x;
+  startY = pos.y;
+  currentRect = {x: startX, y: startY, w: 0, h: 0};
+  drawCanvas();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const pos = getCanvasPos(e);
+
+  if (isDraggingBox && selectedBoxIndex !== -1) {
+    const box = annotBoxes[selectedBoxIndex];
+    let newXc = (pos.x - dragOffsetX) / canvas.width;
+    let newYc = (pos.y - dragOffsetY) / canvas.height;
+    
+    // Clamp to boundaries
+    newXc = Math.max(box[3]/2, Math.min(1 - box[3]/2, newXc));
+    newYc = Math.max(box[4]/2, Math.min(1 - box[4]/2, newYc));
+    
+    annotBoxes[selectedBoxIndex][1] = newXc;
+    annotBoxes[selectedBoxIndex][2] = newYc;
+    drawCanvas();
+    return;
+  }
+
+  if (!isDrawing) return;
+  currentRect.x = Math.min(startX, pos.x);
+  currentRect.y = Math.min(startY, pos.y);
+  currentRect.w = Math.abs(pos.x - startX);
+  currentRect.h = Math.abs(pos.y - startY);
+  drawCanvas();
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (isDraggingBox) {
+    isDraggingBox = false;
+    return;
+  }
+  
+  if (isDrawing && currentRect.w > 5 && currentRect.h > 5) {
+    // Convert to YOLO format
+    const cid = parseInt(document.getElementById('annot-class-select').value) || 0;
+    const xc = (currentRect.x + currentRect.w/2) / canvas.width;
+    const yc = (currentRect.y + currentRect.h/2) / canvas.height;
+    const w = currentRect.w / canvas.width;
+    const h = currentRect.h / canvas.height;
+    annotBoxes.push([cid, xc, yc, w, h]);
+  }
+  isDrawing = false;
+  currentRect = null;
+  drawCanvas();
+});
+
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBoxIndex !== -1) {
+    // Make sure we are not focused on an input field
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+    annotBoxes.splice(selectedBoxIndex, 1);
+    selectedBoxIndex = -1;
+    updateDeleteBoxBtn();
+    drawCanvas();
+  }
+});
+
+document.getElementById('btn-annot-delete-box').addEventListener('click', () => {
+  if (selectedBoxIndex !== -1) {
+    annotBoxes.splice(selectedBoxIndex, 1);
+    selectedBoxIndex = -1;
+    updateDeleteBoxBtn();
+    drawCanvas();
+  }
+});
+
+document.getElementById('btn-annot-clear').addEventListener('click', () => {
+  annotBoxes = [];
+  selectedBoxIndex = -1;
+  updateDeleteBoxBtn();
+  drawCanvas();
+});
+
+document.getElementById('btn-annot-save').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-annot-save');
+  btn.textContent = 'Saving...';
+  try {
+    await fetch(API + `/api/dataset/${dsState.dataset}/labels/${dsState.split}/${currentPreviewFile}`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({labels: annotBoxes})
+    });
+    // refresh stats & classes
+    loadImages();
+    initDataset();
+  } catch {}
+  btn.textContent = 'Save';
+});
+
+document.getElementById('btn-preview-close').addEventListener('click', () => {
+  document.getElementById('ds-preview-section').style.display = 'none';
+  currentPreviewFile = null;
+});
 // Preview delete button
 document.getElementById('btn-preview-delete').addEventListener('click', () => {
   if (!currentPreviewFile) return;

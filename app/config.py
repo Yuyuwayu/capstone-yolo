@@ -26,24 +26,7 @@ WEBCAM_INDEX = 1
 DEFAULT_SOURCE = "webcam"
 
 # ── Dataset Layouts ───────────────────────────────────
-DATASETS = {
-    "custom": {
-        "base": os.path.join(BASE_DIR, "dataset"),
-        "splits": {
-            "all":   {"images": os.path.join(BASE_DIR, "dataset", "images", "all"),   "labels": os.path.join(BASE_DIR, "dataset", "labels", "all")},
-            "train": {"images": os.path.join(BASE_DIR, "dataset", "images", "train"), "labels": os.path.join(BASE_DIR, "dataset", "labels", "train")},
-            "val":   {"images": os.path.join(BASE_DIR, "dataset", "images", "val"),   "labels": os.path.join(BASE_DIR, "dataset", "labels", "val")},
-        },
-    },
-    "roboflow": {
-        "base": BASE_DIR,
-        "splits": {
-            "train": {"images": os.path.join(BASE_DIR, "train", "images"), "labels": os.path.join(BASE_DIR, "train", "labels")},
-            "valid": {"images": os.path.join(BASE_DIR, "valid", "images"), "labels": os.path.join(BASE_DIR, "valid", "labels")},
-            "test":  {"images": os.path.join(BASE_DIR, "test", "images"),  "labels": os.path.join(BASE_DIR, "test", "labels")},
-        },
-    },
-}
+# Datasets are now dynamically discovered from the DATASET_DIR.
 
 # ── Training Defaults ─────────────────────────────────
 DEFAULT_BASE_MODEL = "yolov8n.pt"

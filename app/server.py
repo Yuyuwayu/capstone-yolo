@@ -261,7 +261,23 @@ async def process_frame(file: UploadFile = File(...)):
 @app.get("/api/dataset/list")
 def dataset_list_names():
     """Return all configured dataset names."""
-    return list(config.DATASETS.keys())
+    if not os.path.isdir(config.DATASET_DIR):
+        return []
+    return [d for d in os.listdir(config.DATASET_DIR) if os.path.isdir(os.path.join(config.DATASET_DIR, d))]
+
+@app.post("/api/dataset/{name}/create")
+def dataset_create(name: str):
+    res = dataset_manager.create_dataset(name)
+    if not res.get("success"):
+        raise HTTPException(400, res.get("error", "Failed to create dataset."))
+    return res
+
+@app.delete("/api/dataset/{name}")
+def dataset_delete(name: str):
+    res = dataset_manager.delete_dataset(name)
+    if not res.get("success"):
+        raise HTTPException(400, res.get("error", "Failed to delete dataset."))
+    return res
 
 
 @app.get("/api/dataset/stats")
@@ -319,24 +335,14 @@ async def dataset_upload_images(
     """Upload images and auto-split into train/val based on ratio."""
     import random
 
-    ds = config.DATASETS.get(name)
-    if not ds:
-        raise HTTPException(404, f"Unknown dataset '{name}'.")
+    train_img_dir, _ = dataset_manager._dirs(name, "train")
+    val_img_dir, _ = dataset_manager._dirs(name, "val")
+    
+    if not train_img_dir:
+        raise HTTPException(404, f"Dataset '{name}' not found.")
 
-    # Get train and val paths
-    train_split = ds["splits"].get("train")
-    val_split = ds["splits"].get("val") or ds["splits"].get("valid")
-
-    if not train_split:
-        raise HTTPException(400, "Dataset has no train split configured.")
-
-    train_img_dir = train_split["images"]
     os.makedirs(train_img_dir, exist_ok=True)
-
-    val_img_dir = None
-    if val_split:
-        val_img_dir = val_split["images"]
-        os.makedirs(val_img_dir, exist_ok=True)
+    os.makedirs(val_img_dir, exist_ok=True)
 
     # Read all file data first
     file_data = []
@@ -443,6 +449,32 @@ def dataset_classes(name: str):
     """Return detected class IDs and names from the dataset's labels."""
     names = dataset_manager.get_class_names(name)
     return {"classes": [{"id": k, "name": v} for k, v in names.items()]}
+
+
+class ClassesUpdateRequest(BaseModel):
+    classes: List[str]
+
+
+@app.post("/api/dataset/{name}/classes")
+def dataset_update_classes(name: str, req: ClassesUpdateRequest):
+    success = dataset_manager.save_classes(name, req.classes)
+    return {"success": success}
+
+
+@app.get("/api/dataset/{name}/labels/{split}/{filename}")
+def dataset_get_labels(name: str, split: str, filename: str):
+    labels = dataset_manager.get_labels(name, split, filename)
+    return {"labels": labels}
+
+
+class LabelsUpdateRequest(BaseModel):
+    labels: List[List[float]]
+
+
+@app.post("/api/dataset/{name}/labels/{split}/{filename}")
+def dataset_save_labels(name: str, split: str, filename: str, req: LabelsUpdateRequest):
+    success = dataset_manager.save_labels(name, split, filename, req.labels)
+    return {"success": success}
 
 
 @app.post("/api/dataset/{name}/generate-yaml")

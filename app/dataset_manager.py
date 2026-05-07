@@ -23,24 +23,30 @@ class DatasetManager:
 
     def _dirs(self, dataset, split):
         """Return (images_dir, labels_dir) for a given dataset + split."""
-        ds = config.DATASETS.get(dataset)
-        if not ds:
-            return None, None
-        sp = ds["splits"].get(split)
-        if not sp:
-            return None, None
-        return sp["images"], sp["labels"]
+        img_dir = os.path.join(config.DATASET_DIR, dataset, "images", split)
+        lbl_dir = os.path.join(config.DATASET_DIR, dataset, "labels", split)
+        return img_dir, lbl_dir
 
     # ── Scan / Stats ──────────────────────────────────
 
     def scan_datasets(self):
         out = {}
-        for ds_name, ds_conf in config.DATASETS.items():
+        if not os.path.isdir(config.DATASET_DIR):
+            return out
+        for ds_name in os.listdir(config.DATASET_DIR):
+            ds_base = os.path.join(config.DATASET_DIR, ds_name)
+            if not os.path.isdir(ds_base):
+                continue
+                
             splits = {}
-            for split_name, split_paths in ds_conf["splits"].items():
-                img_dir = split_paths["images"]
-                lbl_dir = split_paths["labels"]
+            for split_name in ("train", "val"):
+                img_dir, lbl_dir = self._dirs(ds_name, split_name)
                 if not os.path.isdir(img_dir):
+                    splits[split_name] = {
+                        "total": 0,
+                        "annotated": 0,
+                        "unannotated": 0,
+                    }
                     continue
                 imgs = self._image_files(img_dir)
                 labels = self._label_stems(lbl_dir)
@@ -50,8 +56,7 @@ class DatasetManager:
                     "annotated": annotated,
                     "unannotated": len(imgs) - annotated,
                 }
-            if splits:
-                out[ds_name] = {"name": ds_name, "splits": splits}
+            out[ds_name] = {"name": ds_name, "splits": splits}
         return out
 
     # ── List Images ───────────────────────────────────
@@ -99,6 +104,8 @@ class DatasetManager:
 
         h, w = img.shape[:2]
         lbl_path = os.path.join(lbl_dir, os.path.splitext(filename)[0] + ".txt")
+        
+        dynamic_classes = self.read_classes(dataset)
 
         if os.path.isfile(lbl_path):
             with open(lbl_path, "r") as f:
@@ -115,7 +122,7 @@ class DatasetManager:
                     x1, y1 = max(0, x1), max(0, y1)
                     x2, y2 = min(w, x2), min(h, y2)
                     color = COLORS.get(cid, (255, 255, 255))
-                    label = CLASSES.get(cid, f"cls{cid}")
+                    label = dynamic_classes.get(cid, f"cls{cid}")
                     cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
                     cv2.putText(img, label, (x1, max(y1 - 6, 12)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
@@ -123,17 +130,42 @@ class DatasetManager:
         _, buf = cv2.imencode(".jpg", img)
         return buf.tobytes()
 
+    def get_labels(self, dataset, split, filename):
+        """Return list of [class_id, x, y, w, h] for a given image."""
+        img_dir, lbl_dir = self._dirs(dataset, split)
+        if not lbl_dir:
+            return []
+        lbl_path = os.path.join(lbl_dir, os.path.splitext(filename)[0] + ".txt")
+        labels = []
+        if os.path.isfile(lbl_path):
+            with open(lbl_path, "r") as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 5:
+                        labels.append([int(parts[0])] + [float(x) for x in parts[1:5]])
+        return labels
+
+    def save_labels(self, dataset, split, filename, labels):
+        """Save list of [class_id, x, y, w, h] to YOLO txt file."""
+        img_dir, lbl_dir = self._dirs(dataset, split)
+        if not lbl_dir:
+            return False
+        lbl_path = os.path.join(lbl_dir, os.path.splitext(filename)[0] + ".txt")
+        if not labels:
+            if os.path.isfile(lbl_path):
+                os.remove(lbl_path)
+            return True
+        os.makedirs(lbl_dir, exist_ok=True)
+        with open(lbl_path, "w") as f:
+            for lbl in labels:
+                f.write(f"{int(lbl[0])} {lbl[1]:.6f} {lbl[2]:.6f} {lbl[3]:.6f} {lbl[4]:.6f}\n")
+        return True
+
     # ── Import ────────────────────────────────────────
 
     def import_folder(self, source_path, dataset_name="custom"):
-        """Copy images from an external folder into dataset/images/all."""
-        ds = config.DATASETS.get(dataset_name)
-        if not ds:
-            return {"success": False, "error": f"Unknown dataset '{dataset_name}'."}
-
-        target_dir = ds["splits"].get("all", ds["splits"].get("train", {})).get("images")
-        if not target_dir:
-            return {"success": False, "error": "No target split found."}
+        """Copy images from an external folder into dataset/images/train."""
+        target_dir, _ = self._dirs(dataset_name, "train")
 
         if not os.path.isdir(source_path):
             return {"success": False, "error": f"Source path not found: {source_path}"}
@@ -150,42 +182,58 @@ class DatasetManager:
     # ── Split ─────────────────────────────────────────
 
     def split_dataset(self, dataset, train_ratio=0.8):
-        """Shuffle images in 'all' and split into train/val."""
-        ds = config.DATASETS.get(dataset)
-        if not ds:
-            return {"success": False, "error": "Unknown dataset."}
+        """Shuffle all images (train + val) and re-split."""
+        train_img, train_lbl = self._dirs(dataset, "train")
+        val_img, val_lbl = self._dirs(dataset, "val")
+        
+        all_items = []
+        for d_img, d_lbl in [(train_img, train_lbl), (val_img, val_lbl)]:
+            if os.path.isdir(d_img):
+                for f in self._image_files(d_img):
+                    lbl = os.path.splitext(f)[0] + ".txt"
+                    lbl_path = os.path.join(d_lbl, lbl)
+                    all_items.append({
+                        "img": os.path.join(d_img, f),
+                        "lbl": lbl_path if os.path.isfile(lbl_path) else None,
+                        "fname": f,
+                        "lname": lbl
+                    })
+                    
+        if not all_items:
+            return {"success": False, "error": "No images found to split."}
+            
+        random.shuffle(all_items)
+        val_count = max(1, int(len(all_items) * (1 - train_ratio)))
+        val_items = all_items[:val_count]
+        train_items = all_items[val_count:]
+        
+        # Temp dir to avoid overwriting during move
+        temp_dir = os.path.join(config.DATASET_DIR, f"{dataset}_temp_split")
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        try:
+            # Move all to temp
+            for idx, item in enumerate(all_items):
+                temp_img = os.path.join(temp_dir, f"{idx}_{item['fname']}")
+                shutil.move(item["img"], temp_img)
+                item["temp_img"] = temp_img
+                if item["lbl"]:
+                    temp_lbl = os.path.join(temp_dir, f"{idx}_{item['lname']}")
+                    shutil.move(item["lbl"], temp_lbl)
+                    item["temp_lbl"] = temp_lbl
+                    
+            # Distribute back
+            for items, (d_img, d_lbl) in [(train_items, (train_img, train_lbl)), (val_items, (val_img, val_lbl))]:
+                os.makedirs(d_img, exist_ok=True)
+                os.makedirs(d_lbl, exist_ok=True)
+                for item in items:
+                    shutil.move(item["temp_img"], os.path.join(d_img, item["fname"]))
+                    if item["lbl"]:
+                        shutil.move(item["temp_lbl"], os.path.join(d_lbl, item["lname"]))
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
-        all_split = ds["splits"].get("all")
-        train_split = ds["splits"].get("train")
-        val_split = ds["splits"].get("val")
-
-        if not all_split or not train_split or not val_split:
-            return {"success": False, "error": "Dataset doesn't have all/train/val splits."}
-
-        src_img = all_split["images"]
-        src_lbl = all_split["labels"]
-
-        if not os.path.isdir(src_img):
-            return {"success": False, "error": "No images in 'all' split."}
-
-        images = self._image_files(src_img)
-        random.shuffle(images)
-
-        val_count = max(1, int(len(images) * (1 - train_ratio)))
-        val_files = images[:val_count]
-        train_files = images[val_count:]
-
-        for split_paths, files in [(train_split, train_files), (val_split, val_files)]:
-            os.makedirs(split_paths["images"], exist_ok=True)
-            os.makedirs(split_paths["labels"], exist_ok=True)
-            for f in files:
-                shutil.copy2(os.path.join(src_img, f), os.path.join(split_paths["images"], f))
-                lbl = os.path.splitext(f)[0] + ".txt"
-                lbl_src = os.path.join(src_lbl, lbl) if os.path.isdir(src_lbl) else ""
-                if os.path.isfile(lbl_src):
-                    shutil.copy2(lbl_src, os.path.join(split_paths["labels"], lbl))
-
-        return {"success": True, "train": len(train_files), "val": len(val_files)}
+        return {"success": True, "train": len(train_items), "val": len(val_items)}
 
     # ── Delete ────────────────────────────────────────
 
@@ -219,63 +267,30 @@ class DatasetManager:
         if not source_names or len(source_names) < 2:
             return {"success": False, "error": "Select at least 2 datasets to merge."}
 
-        if target_name in config.DATASETS:
+        if os.path.isdir(os.path.join(config.DATASET_DIR, target_name)):
             return {"success": False, "error": f"Dataset '{target_name}' already exists."}
 
-        # Create target dataset structure
-        base = os.path.join(config.DATASET_DIR, target_name)
-        target_splits = {}
-        for split_name in ("train", "val"):
-            img_dir = os.path.join(base, split_name, "images")
-            lbl_dir = os.path.join(base, split_name, "labels")
-            os.makedirs(img_dir, exist_ok=True)
-            os.makedirs(lbl_dir, exist_ok=True)
-            target_splits[split_name] = {"images": img_dir, "labels": lbl_dir}
-
-        # Copy from each source dataset
         total_copied = 0
         for src_name in source_names:
-            ds = config.DATASETS.get(src_name)
-            if not ds:
-                continue
-
-            for split_name, split_paths in ds["splits"].items():
-                # Map source split to target (valid → val, test → skip or val)
-                target_split = split_name
-                if split_name == "valid":
-                    target_split = "val"
-                if split_name in ("all", "test"):
-                    continue  # skip 'all' and 'test'
-
-                if target_split not in target_splits:
-                    continue
-
-                src_img = split_paths.get("images", "")
-                src_lbl = split_paths.get("labels", "")
-                tgt_img = target_splits[target_split]["images"]
-                tgt_lbl = target_splits[target_split]["labels"]
+            for split_name in ("train", "val"):
+                src_img, src_lbl = self._dirs(src_name, split_name)
+                tgt_img, tgt_lbl = self._dirs(target_name, split_name)
 
                 if os.path.isdir(src_img):
+                    os.makedirs(tgt_img, exist_ok=True)
+                    os.makedirs(tgt_lbl, exist_ok=True)
                     for f in os.listdir(src_img):
                         if f.lower().endswith((".jpg", ".jpeg", ".png")):
                             src_path = os.path.join(src_img, f)
-                            # Prefix filename with source name to avoid collisions
                             dst_name = f"{src_name}_{f}"
                             shutil.copy2(src_path, os.path.join(tgt_img, dst_name))
                             total_copied += 1
 
-                            # Copy matching label
                             lbl_name = os.path.splitext(f)[0] + ".txt"
-                            src_lbl_path = os.path.join(src_lbl, lbl_name) if os.path.isdir(src_lbl) else ""
+                            src_lbl_path = os.path.join(src_lbl, lbl_name)
                             if os.path.isfile(src_lbl_path):
                                 dst_lbl_name = f"{src_name}_{lbl_name}"
                                 shutil.copy2(src_lbl_path, os.path.join(tgt_lbl, dst_lbl_name))
-
-        # Register new dataset in config
-        config.DATASETS[target_name] = {
-            "base": base,
-            "splits": target_splits,
-        }
 
         return {
             "success": True,
@@ -302,13 +317,9 @@ class DatasetManager:
 
     def scan_classes(self, dataset):
         """Scan all label files across all splits and return unique class IDs."""
-        ds = config.DATASETS.get(dataset)
-        if not ds:
-            return []
-
         class_ids = set()
-        for split_paths in ds["splits"].values():
-            lbl_dir = split_paths.get("labels", "")
+        for split_name in ("train", "val"):
+            _, lbl_dir = self._dirs(dataset, split_name)
             if not os.path.isdir(lbl_dir):
                 continue
             for fname in os.listdir(lbl_dir):
@@ -322,40 +333,52 @@ class DatasetManager:
                                 class_ids.add(int(parts[0]))
                             except ValueError:
                                 pass
-
         return sorted(class_ids)
 
+    def get_classes_txt_path(self, dataset):
+        return os.path.join(config.DATASET_DIR, dataset, "classes.txt")
+
+    def read_classes(self, dataset):
+        path = self.get_classes_txt_path(dataset)
+        if path and os.path.isfile(path):
+            with open(path, "r") as f:
+                lines = [l.strip() for l in f if l.strip()]
+                return {i: name for i, name in enumerate(lines)}
+        return CLASSES
+
+    def save_classes(self, dataset, classes_list):
+        path = self.get_classes_txt_path(dataset)
+        if not path: return False
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            for c in classes_list:
+                f.write(str(c).strip() + "\n")
+        return True
+
     def get_class_names(self, dataset):
-        """Return {id: name} mapping. Uses known CLASSES, falls back to generic."""
+        """Return {id: name} mapping for dataset."""
+        dynamic_classes = self.read_classes(dataset)
         ids = self.scan_classes(dataset)
+        # Ensure all scanned IDs have a name, defaulting to "class_X" if missing
         names = {}
         for cid in ids:
-            names[cid] = CLASSES.get(cid, f"class_{cid}")
+            names[cid] = dynamic_classes.get(cid, f"class_{cid}")
+        # Add any classes that are in classes.txt even if not used in labels yet
+        for cid, name in dynamic_classes.items():
+            if cid not in names:
+                names[cid] = name
         return names
 
     def generate_training_yaml(self, dataset):
         """Auto-generate a data.yaml for YOLO training and return info."""
-        ds = config.DATASETS.get(dataset)
-        if not ds:
-            return {"success": False, "error": f"Unknown dataset '{dataset}'."}
-
         class_names = self.get_class_names(dataset)
         if not class_names:
             return {"success": False, "error": "No annotated labels found in dataset."}
 
-        # Determine train/val paths
-        train_img = None
-        val_img = None
-        for sname in ("train",):
-            sp = ds["splits"].get(sname)
-            if sp and os.path.isdir(sp["images"]):
-                train_img = sp["images"]
-        for sname in ("val", "valid"):
-            sp = ds["splits"].get(sname)
-            if sp and os.path.isdir(sp["images"]):
-                val_img = sp["images"]
+        train_img, _ = self._dirs(dataset, "train")
+        val_img, _ = self._dirs(dataset, "val")
 
-        if not train_img:
+        if not os.path.isdir(train_img):
             return {"success": False, "error": "No train split with images found."}
 
         # Build YAML content
@@ -390,3 +413,35 @@ class DatasetManager:
             "train_images": train_img,
             "val_images": val_img,
         }
+
+    # ── Dataset Management ────────────────────────────
+
+    def create_dataset(self, name: str):
+        if not name or " " in name or "/" in name or "\\" in name:
+            return {"success": False, "error": "Invalid dataset name. Use alphanumeric characters and underscores."}
+            
+        base = os.path.join(config.DATASET_DIR, name)
+        if os.path.exists(base):
+            return {"success": False, "error": f"Dataset '{name}' already exists."}
+            
+        for split in ("train", "val"):
+            os.makedirs(os.path.join(base, "images", split), exist_ok=True)
+            os.makedirs(os.path.join(base, "labels", split), exist_ok=True)
+            
+        # Create default classes.txt
+        with open(os.path.join(base, "classes.txt"), "w") as f:
+            f.write("ikan\npakan\n")
+            
+        return {"success": True, "dataset": name}
+        
+    def delete_dataset(self, name: str):
+        if not name:
+            return {"success": False, "error": "Invalid dataset name."}
+            
+        base = os.path.join(config.DATASET_DIR, name)
+        if not os.path.exists(base):
+            return {"success": False, "error": f"Dataset '{name}' not found."}
+            
+        shutil.rmtree(base, ignore_errors=True)
+        return {"success": True}
+
