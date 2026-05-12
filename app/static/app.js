@@ -1096,7 +1096,11 @@ document.getElementById('btn-train-start').addEventListener('click', async () =>
 });
 
 document.getElementById('btn-train-stop').addEventListener('click', async () => {
-  await fetch(API + '/api/training/stop', { method: 'POST' });
+  const res = await fetch(API + '/api/training/stop', { method: 'POST' });
+  const data = await res.json();
+  if (!data.success) {
+    document.getElementById('training-progress').style.display = 'none';
+  }
 });
 
 function startTrainingPolling() {
@@ -1116,8 +1120,14 @@ async function pollTraining() {
 
     const progressEl = document.getElementById('training-progress');
 
-    if (d.is_training || d.current_epoch > 0) {
-      progressEl.style.display = 'block';
+    if (d.is_training || d.current_epoch > 0 || d.logs.length > 0) {
+      // Don't override display if it was hidden by the stop button and is no longer training
+      if (d.is_training) {
+        progressEl.style.display = 'block';
+      } else if (progressEl.style.display !== 'none' && d.logs.length > 0) {
+        progressEl.style.display = 'block';
+      }
+
       document.getElementById('tr-epoch-label').textContent = `${d.current_epoch} / ${d.total_epochs}`;
       document.getElementById('tr-progress-bar').style.width = d.progress + '%';
 

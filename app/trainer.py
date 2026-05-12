@@ -56,8 +56,14 @@ class YOLOTrainer:
         return {"success": True, "total_epochs": epochs}
 
     def _run(self, model, data, epochs, batch, imgsz, device):
+        yolo_cmd = "yolo.exe" if os.name == "nt" else "yolo"
+        yolo_path = os.path.join(os.path.dirname(sys.executable), yolo_cmd)
+        
+        if not os.path.exists(yolo_path):
+            yolo_path = yolo_cmd
+
         cmd = [
-            sys.executable, "-m", "ultralytics",
+            yolo_path,
             "detect", "train",
             f"model={model}",
             f"data={data}",
@@ -75,6 +81,8 @@ class YOLOTrainer:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 cwd=config.BASE_DIR,
                 bufsize=1,
             )
