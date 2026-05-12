@@ -87,7 +87,10 @@ class YOLOTrainer:
                 bufsize=1,
             )
 
-            epoch_re = re.compile(r"(\d+)/(\d+)")
+            # Regex to match epoch line (epoch/total, gpu_mem, box_loss, cls_loss, dfl_loss)
+            epoch_re = re.compile(r"(\d+)/(\d+)\s+\S+\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)")
+            # Regex to match eval line (Class, Images, Instances, Box(P), R, mAP50, mAP50-95)
+            eval_re = re.compile(r"\ball\s+\d+\s+\d+\s+[0-9.]+\s+[0-9.]+\s+([0-9.]+)\s+([0-9e.-]+)")
 
             for line in iter(self._process.stdout.readline, ""):
                 line = line.rstrip()
@@ -95,10 +98,19 @@ class YOLOTrainer:
                     continue
                 self.log_buffer.append(line)
 
-                # Try to parse epoch number
-                m = epoch_re.search(line)
-                if m:
-                    self.current_epoch = int(m.group(1))
+                # Try to parse epoch and losses
+                m_epoch = epoch_re.search(line)
+                if m_epoch:
+                    self.current_epoch = int(m_epoch.group(1))
+                    self.latest_metrics["box_loss"] = m_epoch.group(3)
+                    self.latest_metrics["cls_loss"] = m_epoch.group(4)
+                    self.latest_metrics["dfl_loss"] = m_epoch.group(5)
+                
+                # Try to parse evaluation metrics
+                m_eval = eval_re.search(line)
+                if m_eval:
+                    self.latest_metrics["map50"] = m_eval.group(1)
+                    self.latest_metrics["map50_95"] = m_eval.group(2)
 
             self._process.wait()
 
@@ -125,6 +137,7 @@ class YOLOTrainer:
             "progress": round(self.current_epoch / self.total_epochs * 100, 1) if self.total_epochs else 0,
             "new_model_available": self.new_model_available,
             "logs": list(self.log_buffer)[-50:],  # last 50 lines
+            "metrics": self.latest_metrics,
         }
 
     def get_full_logs(self):

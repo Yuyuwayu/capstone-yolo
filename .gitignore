@@ -36,3 +36,6 @@ test/
 # OS
 .DS_Store
 Thumbs.db
+# generated data
+*.cache
+custom_auto.yaml

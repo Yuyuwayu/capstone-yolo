@@ -11,6 +11,8 @@ let envOk = false;
 let dsState = { dataset: '', split: 'train', filter: 'all', selected: new Set() };
 let monitorInterval = null;
 let trainingInterval = null;
+let trLossTrend = [];
+let trLastEpoch = 0;
 let trendData = [];
 
 // ══════════════════════════════════════════════════
@@ -1088,6 +1090,15 @@ document.getElementById('btn-train-start').addEventListener('click', async () =>
     imgsz: Number(document.getElementById('tr-imgsz').value),
     device: document.getElementById('tr-device').value,
   };
+  document.getElementById('tr-metrics-grid').style.display = 'none';
+  document.getElementById('tr-trend-container').style.display = 'none';
+  trLossTrend = [];
+  trLastEpoch = 0;
+  
+  ['box', 'cls', 'dfl', 'map50', 'map50-95'].forEach(id => {
+    document.getElementById('tr-metric-' + id).textContent = '—';
+  });
+  
   await fetch(API + '/api/training/start', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(cfg)
@@ -1130,6 +1141,23 @@ async function pollTraining() {
 
       document.getElementById('tr-epoch-label').textContent = `${d.current_epoch} / ${d.total_epochs}`;
       document.getElementById('tr-progress-bar').style.width = d.progress + '%';
+
+      if (d.metrics && Object.keys(d.metrics).length > 0) {
+        document.getElementById('tr-metrics-grid').style.display = 'grid';
+        if (d.metrics.box_loss) document.getElementById('tr-metric-box').textContent = d.metrics.box_loss;
+        if (d.metrics.cls_loss) document.getElementById('tr-metric-cls').textContent = d.metrics.cls_loss;
+        if (d.metrics.dfl_loss) document.getElementById('tr-metric-dfl').textContent = d.metrics.dfl_loss;
+        if (d.metrics.map50) document.getElementById('tr-metric-map50').textContent = d.metrics.map50;
+        if (d.metrics.map50_95) document.getElementById('tr-metric-map50-95').textContent = d.metrics.map50_95;
+
+        // Update Trend
+        if (d.current_epoch > trLastEpoch && d.metrics.box_loss) {
+          trLastEpoch = d.current_epoch;
+          trLossTrend.push(parseFloat(d.metrics.box_loss));
+          document.getElementById('tr-trend-container').style.display = 'block';
+          drawLineChart('chart-tr-trend', trLossTrend, 'var(--tertiary)');
+        }
+      }
 
       const logEl = document.getElementById('tr-log');
       logEl.innerHTML = d.logs.map(l => {

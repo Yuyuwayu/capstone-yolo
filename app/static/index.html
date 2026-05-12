@@ -351,8 +351,40 @@
           <div class="progress-track" style="margin-bottom:var(--sp-lg)">
             <div class="progress-fill" id="tr-progress-bar" style="width:0%"></div>
           </div>
-          <p class="t-label" style="margin-bottom:var(--sp-sm)">Log</p>
-          <div class="terminal" id="tr-log"></div>
+          <div class="grid-3" style="margin-bottom:var(--sp-md); display:none;" id="tr-metrics-grid">
+            <div class="card-compact" style="border:1px solid rgba(143,165,181,0.1)">
+              <p class="t-label" style="margin-bottom:var(--sp-xs)">Box Loss</p>
+              <p class="t-display" style="font-size:2rem;margin:0" id="tr-metric-box">—</p>
+            </div>
+            <div class="card-compact" style="border:1px solid rgba(143,165,181,0.1)">
+              <p class="t-label" style="margin-bottom:var(--sp-xs)">Class Loss</p>
+              <p class="t-display" style="font-size:2rem;margin:0" id="tr-metric-cls">—</p>
+            </div>
+            <div class="card-compact" style="border:1px solid rgba(143,165,181,0.1)">
+              <p class="t-label" style="margin-bottom:var(--sp-xs)">DFL Loss</p>
+              <p class="t-display" style="font-size:2rem;margin:0" id="tr-metric-dfl">—</p>
+            </div>
+            <div class="card-compact" style="border:1px solid rgba(143,165,181,0.1)">
+              <p class="t-label" style="margin-bottom:var(--sp-xs)">mAP50</p>
+              <p class="t-display" style="font-size:2rem;color:var(--tertiary);margin:0" id="tr-metric-map50">—</p>
+            </div>
+            <div class="card-compact" style="border:1px solid rgba(143,165,181,0.1)">
+              <p class="t-label" style="margin-bottom:var(--sp-xs)">mAP50-95</p>
+              <p class="t-display" style="font-size:2rem;color:var(--tertiary);margin:0" id="tr-metric-map50-95">—</p>
+            </div>
+          </div>
+
+          <details style="margin-bottom:var(--sp-sm)">
+            <summary class="t-label" style="cursor:pointer;user-select:none;outline:none;padding:var(--sp-xs) 0;">Show Raw Logs</summary>
+            <div class="terminal" id="tr-log" style="margin-top:var(--sp-sm)"></div>
+          </details>
+
+          <div class="card-compact" style="margin-bottom:var(--sp-sm);border:1px solid rgba(143,165,181,0.1);display:none;" id="tr-trend-container">
+            <p class="t-label" style="margin-bottom:var(--sp-xs)">Loss Trend</p>
+            <div class="chart-container">
+              <canvas id="chart-tr-trend"></canvas>
+            </div>
+          </div>
           <div style="margin-top:var(--sp-md);text-align:right">
             <button class="btn btn-danger btn-sm" id="btn-train-stop">Stop</button>
           </div>
@@ -396,6 +428,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=2"></script>
 </body>
 </html>
