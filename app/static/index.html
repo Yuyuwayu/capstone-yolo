@@ -398,22 +398,8 @@
         <h2 style="margin-bottom:var(--sp-lg)">Models</h2>
         <div id="models-list"></div>
 
-        <!-- Curves -->
-        <div class="section" id="curves-section" style="display:none;margin-top:var(--sp-lg)">
-          <p class="t-label" style="margin-bottom:var(--sp-sm)">Training Curves — <span id="curves-model-name"></span></p>
-          <div class="grid-2">
-            <div class="chart-container">
-              <p class="t-label" style="margin-bottom:var(--sp-xs)">mAP50</p>
-              <canvas id="chart-map"></canvas>
-            </div>
-            <div class="chart-container">
-              <p class="t-label" style="margin-bottom:var(--sp-xs)">Loss</p>
-              <canvas id="chart-loss"></canvas>
-            </div>
-          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
   </main>
 
@@ -428,6 +414,42 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=2"></script>
+  <!-- Model Detail Dialog (hidden) -->
+  <div class="dialog-overlay" id="model-detail-dialog" style="display:none; z-index: 9999;">
+    <div class="dialog" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
+      <h3 style="margin-bottom:var(--sp-sm)" id="model-detail-title">Model Details</h3>
+      
+      <div class="grid-2" style="margin-bottom:var(--sp-md); font-family:var(--font-mono); font-size:0.875rem; color:var(--secondary);">
+        <div><strong>Dataset:</strong> <span id="mdl-det-ds"></span></div>
+        <div><strong>Base Model:</strong> <span id="mdl-det-base"></span></div>
+        <div><strong>Epochs:</strong> <span id="mdl-det-epochs"></span></div>
+        <div><strong>Size:</strong> <span id="mdl-det-size"></span> MB</div>
+        <div style="grid-column: 1 / -1"><strong>Path:</strong> <span id="mdl-det-path" style="word-break: break-all;"></span></div>
+      </div>
+
+      <p class="t-label" style="margin-bottom:var(--sp-xs)">Final Metrics</p>
+      <div class="grid-3" style="margin-bottom:var(--sp-md)" id="mdl-det-metrics">
+        <!-- populated by js -->
+      </div>
+
+      <p class="t-label" style="margin-bottom:var(--sp-xs)">Training Curves</p>
+      <div class="grid-2" style="margin-bottom:var(--sp-md)">
+        <div class="chart-container">
+          <p class="t-label" style="margin-bottom:var(--sp-xs)">mAP50</p>
+          <canvas id="chart-map"></canvas>
+        </div>
+        <div class="chart-container">
+          <p class="t-label" style="margin-bottom:var(--sp-xs)">Loss</p>
+          <canvas id="chart-loss"></canvas>
+        </div>
+      </div>
+
+      <div class="dialog-actions">
+        <button class="btn btn-primary btn-sm" id="btn-model-detail-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>

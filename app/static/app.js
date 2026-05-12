@@ -14,6 +14,7 @@ let trainingInterval = null;
 let trLossTrend = [];
 let trLastEpoch = 0;
 let trendData = [];
+let globalModels = [];
 
 // ══════════════════════════════════════════════════
 // ROUTER
@@ -1189,6 +1190,7 @@ async function initModels() {
   try {
     const res = await fetch(API + '/api/models');
     const models = await res.json();
+    globalModels = models;
 
     const listEl = document.getElementById('models-list');
     if (!models.length) {
@@ -1234,12 +1236,37 @@ window.deleteModel = function(name) {
 
 window.viewCurves = async function(name) {
   try {
+    const model = globalModels.find(m => m.name === name);
+    if (!model) return;
+
+    // Populate Details
+    document.getElementById('model-detail-title').textContent = model.name;
+    document.getElementById('mdl-det-ds').textContent = model.dataset || 'N/A';
+    document.getElementById('mdl-det-base').textContent = model.base_model || 'N/A';
+    document.getElementById('mdl-det-epochs').textContent = model.epochs || 'N/A';
+    document.getElementById('mdl-det-size').textContent = model.size_mb || 'N/A';
+    document.getElementById('mdl-det-path').textContent = model.path || 'N/A';
+
+    // Populate Metrics
+    const metricsEl = document.getElementById('mdl-det-metrics');
+    if (model.metrics && Object.keys(model.metrics).length > 0) {
+      metricsEl.innerHTML = Object.entries(model.metrics).map(([k, v]) => `
+        <div class="card-compact" style="border:1px solid rgba(143,165,181,0.1)">
+          <p class="t-label" style="margin-bottom:var(--sp-xs); font-size:0.7rem;">${k.toUpperCase()}</p>
+          <p class="t-mono" style="font-size:1.25rem;margin:0;color:var(--tertiary)">${v}</p>
+        </div>
+      `).join('');
+    } else {
+      metricsEl.innerHTML = '<p class="t-secondary">No final metrics found.</p>';
+    }
+
+    // Show Dialog
+    document.getElementById('model-detail-dialog').style.display = 'flex';
+
+    // Fetch Curves
     const res = await fetch(API + '/api/models/' + name + '/curves');
     const data = await res.json();
     if (!data || !data.length) return;
-
-    document.getElementById('curves-section').style.display = 'block';
-    document.getElementById('curves-model-name').textContent = name;
 
     const mapData = data.map(d => d.mAP50).filter(v => v !== undefined);
     const lossData = data.map(d => d.box_loss).filter(v => v !== undefined);
@@ -1250,6 +1277,10 @@ window.viewCurves = async function(name) {
     }, 100);
   } catch {}
 };
+
+document.getElementById('btn-model-detail-close').addEventListener('click', () => {
+  document.getElementById('model-detail-dialog').style.display = 'none';
+});
 
 // ══════════════════════════════════════════════════
 // CONFIRM DIALOG
