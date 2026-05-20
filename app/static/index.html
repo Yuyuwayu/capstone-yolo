@@ -201,6 +201,8 @@
           <div class="preview-header" style="flex-wrap:wrap;gap:var(--sp-sm)">
             <div style="display:flex;align-items:center;gap:var(--sp-sm)">
               <button class="btn btn-outline btn-sm" id="btn-preview-close">← Back</button>
+              <button class="btn btn-outline btn-sm" id="btn-preview-prev" title="Previous (Arrow Left)">◀</button>
+              <button class="btn btn-outline btn-sm" id="btn-preview-next" title="Next (Arrow Right)">▶</button>
               <p class="t-label">Annotate — <span id="ds-preview-name"></span></p>
             </div>
             <div style="display:flex;align-items:center;gap:var(--sp-sm)">
@@ -225,7 +227,7 @@
           <div class="form-group">
             <label class="form-label">Import Images (auto-splits to train/val)</label>
             <div class="flex gap-sm items-center flex-wrap">
-              <input type="file" id="ds-import-files" accept="image/*" multiple style="display:none" />
+              <input type="file" id="ds-import-files" accept="image/*,.txt" multiple style="display:none" />
               <input type="file" id="ds-import-folder" webkitdirectory multiple style="display:none" />
               <button class="btn btn-primary btn-sm" id="btn-import">Files…</button>
               <button class="btn btn-outline btn-sm" id="btn-import-folder">Folder…</button>
@@ -339,7 +341,13 @@
               <input class="form-input" id="tr-imgsz" type="number" value="640" />
             </div>
           </div>
-          <button class="btn btn-primary" id="btn-train-start">Start Training</button>
+          <div class="flex gap-md items-center" style="margin-top:var(--sp-md)">
+            <button class="btn btn-primary" id="btn-train-start">Start Training</button>
+            <label class="chip-checkbox" style="cursor:pointer" title="Automatically shut down the computer after training completes">
+              <input type="checkbox" id="tr-shutdown" />
+              💤 Auto-shutdown after training
+            </label>
+          </div>
         </div>
 
         <!-- Progress -->
@@ -450,6 +458,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=3"></script>
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

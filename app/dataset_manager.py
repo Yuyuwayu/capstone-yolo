@@ -164,20 +164,30 @@ class DatasetManager:
     # ── Import ────────────────────────────────────────
 
     def import_folder(self, source_path, dataset_name="custom"):
-        """Copy images from an external folder into dataset/images/train."""
-        target_dir, _ = self._dirs(dataset_name, "train")
+        """Copy images and labels from an external folder into dataset/images/train and dataset/labels/train."""
+        target_img_dir, target_lbl_dir = self._dirs(dataset_name, "train")
 
         if not os.path.isdir(source_path):
             return {"success": False, "error": f"Source path not found: {source_path}"}
 
-        os.makedirs(target_dir, exist_ok=True)
-        count = 0
+        os.makedirs(target_img_dir, exist_ok=True)
+        os.makedirs(target_lbl_dir, exist_ok=True)
+        count_img = 0
+        count_lbl = 0
         for f in os.listdir(source_path):
             if f.lower().endswith((".jpg", ".jpeg", ".png")):
-                shutil.copy2(os.path.join(source_path, f), os.path.join(target_dir, f))
-                count += 1
+                # Copy image
+                shutil.copy2(os.path.join(source_path, f), os.path.join(target_img_dir, f))
+                count_img += 1
+                
+                # Check for corresponding label file and copy if exists
+                lbl_filename = os.path.splitext(f)[0] + ".txt"
+                lbl_path = os.path.join(source_path, lbl_filename)
+                if os.path.isfile(lbl_path):
+                    shutil.copy2(lbl_path, os.path.join(target_lbl_dir, lbl_filename))
+                    count_lbl += 1
 
-        return {"success": True, "imported": count}
+        return {"success": True, "imported_images": count_img, "imported_labels": count_lbl}
 
     # ── Split ─────────────────────────────────────────
 

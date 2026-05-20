@@ -8,7 +8,7 @@ let currentPage = 'monitor';
 let envOk = false;
 
 // ── State ─────────────────────────────────────────
-let dsState = { dataset: '', split: 'train', filter: 'all', selected: new Set() };
+let dsState = { dataset: '', split: 'train', filter: 'all', selected: new Set(), imageList: [] };
 let monitorInterval = null;
 let trainingInterval = null;
 let trLossTrend = [];
@@ -585,11 +585,14 @@ async function loadImages() {
       return;
     }
 
+    // Store image list for prev/next navigation
+    dsState.imageList = images.map(img => img.filename);
+
     gallery.innerHTML = images.map(img => `
       <div class="gallery-item ${dsState.selected.has(img.filename) ? 'selected' : ''}" data-name="${img.filename}">
         <input type="checkbox" class="checkbox gallery-check" ${dsState.selected.has(img.filename) ? 'checked' : ''} />
         <button class="gallery-delete" title="Delete">✗</button>
-        <img loading="lazy" src="${API}/api/dataset/${dsState.dataset}/image/${dsState.split}/${img.filename}" alt="${img.filename}" />
+        <img loading="lazy" src="${API}/api/dataset/${dsState.dataset}/preview/${dsState.split}/${img.filename}" alt="${img.filename}" />
         <span class="gallery-badge ${img.has_label ? 'badge-annotated' : 'badge-missing'}">${img.has_label ? '✓' : '✗'}</span>
       </div>
     `).join('');
@@ -698,18 +701,44 @@ document.getElementById('btn-classes-save').addEventListener('click', async () =
 
 async function previewImage(filename) {
   currentPreviewFile = filename;
-  document.getElementById('ds-preview-section').style.display = 'block';
+  const section = document.getElementById('ds-preview-section');
+  section.style.display = 'block';
   document.getElementById('ds-preview-name').textContent = filename;
   
-  // Load image
-  imgEl.src = `${API}/api/dataset/${dsState.dataset}/image/${dsState.split}/${filename}`;
+  // Scroll the preview section into view
+  setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   
-  // Load labels
-  const res = await fetch(API + `/api/dataset/${dsState.dataset}/labels/${dsState.split}/${filename}`);
-  const data = await res.json();
-  annotBoxes = data.labels || []; // [[id, xc, yc, w, h]]
+  // Update prev/next button state
+  updatePrevNextBtns();
+
+  // Fetch labels FIRST, then load the image so onload draws correctly
+  try {
+    const res = await fetch(API + `/api/dataset/${dsState.dataset}/labels/${dsState.split}/${filename}`);
+    const data = await res.json();
+    annotBoxes = data.labels || []; // [[id, xc, yc, w, h]]
+  } catch {
+    annotBoxes = [];
+  }
   selectedBoxIndex = -1;
   updateDeleteBoxBtn();
+  
+  // Now load image — onload will call drawCanvas() with labels already set
+  const newSrc = `${API}/api/dataset/${dsState.dataset}/image/${dsState.split}/${filename}`;
+  if (imgEl.src === newSrc) {
+    // Same src won't re-trigger onload, draw manually
+    drawCanvas();
+  } else {
+    imgEl.src = newSrc;
+  }
+}
+
+function updatePrevNextBtns() {
+  const list = dsState.imageList || [];
+  const idx = list.indexOf(currentPreviewFile);
+  const prevBtn = document.getElementById('btn-preview-prev');
+  const nextBtn = document.getElementById('btn-preview-next');
+  if (prevBtn) prevBtn.disabled = idx <= 0;
+  if (nextBtn) nextBtn.disabled = idx < 0 || idx >= list.length - 1;
 }
 
 function updateDeleteBoxBtn() {
@@ -730,6 +759,9 @@ function drawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
   
+  // Calculate a scaling factor based on image resolution
+  const baseScale = Math.max(canvas.width, canvas.height) / 800;
+  
   // Draw existing boxes
   annotBoxes.forEach((box, i) => {
     const [cid, xc, yc, w, h] = box;
@@ -739,17 +771,19 @@ function drawCanvas() {
     const ph = h * canvas.height;
     
     ctx.strokeStyle = i === selectedBoxIndex ? '#fff' : (COLORS[cid % COLORS.length] || '#00ff00');
-    ctx.lineWidth = i === selectedBoxIndex ? 4 : 2;
+    ctx.lineWidth = i === selectedBoxIndex ? 4 * baseScale : 2 * baseScale;
     ctx.strokeRect(px, py, pw, ph);
     
     // Label bg
     ctx.fillStyle = ctx.strokeStyle;
     const name = annotClasses[cid] || `cls${cid}`;
-    ctx.font = '24px monospace';
+    const fontSize = Math.round(20 * baseScale);
+    ctx.font = `${fontSize}px monospace`;
     const txtWidth = ctx.measureText(name).width;
-    ctx.fillRect(px, py - 30, txtWidth + 10, 30);
+    const bgHeight = 30 * baseScale;
+    ctx.fillRect(px, py - bgHeight, txtWidth + (10 * baseScale), bgHeight);
     ctx.fillStyle = '#000';
-    ctx.fillText(name, px + 5, py - 6);
+    ctx.fillText(name, px + (5 * baseScale), py - (6 * baseScale));
   });
   
   // Draw current rect
@@ -910,19 +944,47 @@ document.getElementById('btn-preview-delete').addEventListener('click', () => {
   });
 });
 
+// Prev / Next image navigation in preview
+document.getElementById('btn-preview-prev').addEventListener('click', () => {
+  const list = dsState.imageList || [];
+  const idx = list.indexOf(currentPreviewFile);
+  if (idx > 0) previewImage(list[idx - 1]);
+});
+document.getElementById('btn-preview-next').addEventListener('click', () => {
+  const list = dsState.imageList || [];
+  const idx = list.indexOf(currentPreviewFile);
+  if (idx >= 0 && idx < list.length - 1) previewImage(list[idx + 1]);
+});
+
+// Keyboard shortcuts for prev/next in preview
+document.addEventListener('keydown', (e) => {
+  if (!currentPreviewFile) return;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    document.getElementById('btn-preview-prev').click();
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    document.getElementById('btn-preview-next').click();
+  }
+});
+
 // Import — shared upload function (auto-splits into train/val)
 async function uploadImages(fileList) {
   const status = document.getElementById('ds-import-status');
-  // Filter to image files only (folder browse includes all files)
-  const images = [...fileList].filter(f =>
-    /\.(jpe?g|png|bmp|webp|tiff?)$/i.test(f.name)
+  // Include image files and .txt label files
+  const filesToUpload = [...fileList].filter(f =>
+    /\.(jpe?g|png|bmp|webp|tiff?|txt)$/i.test(f.name)
   );
-  if (!images.length) { status.textContent = 'No images found'; return; }
+  if (!filesToUpload.length) { status.textContent = 'No images or labels found'; return; }
 
   const ratio = document.getElementById('ds-split-ratio').value / 100;
-  status.textContent = `Uploading ${images.length} image(s)…`;
+  status.textContent = `Uploading ${filesToUpload.length} file(s)…`;
   const form = new FormData();
-  for (const f of images) form.append('files', f);
+  for (const f of filesToUpload) {
+    const path = f.webkitRelativePath || f.name;
+    form.append('files', f, path);
+  }
 
   try {
     const res = await fetch(API + `/api/dataset/${dsState.dataset}/upload-images?train_ratio=${ratio}`, {
@@ -930,7 +992,9 @@ async function uploadImages(fileList) {
     });
     const data = await res.json();
     if (data.success) {
-      status.textContent = `✓ ${data.imported} imported (train: ${data.train}, val: ${data.val})`;
+      let msg = `✓ ${data.imported} imported (train: ${data.train}, val: ${data.val})`;
+      if (data.skipped > 0) msg += ` · ${data.skipped} skipped (duplicate)`;
+      status.textContent = msg;
       initDataset();
     } else {
       status.textContent = data.error || 'Failed';
@@ -1083,6 +1147,15 @@ document.getElementById('tr-dataset').addEventListener('change', (e) => {
 });
 
 document.getElementById('btn-train-start').addEventListener('click', async () => {
+  const shutdownChecked = document.getElementById('tr-shutdown').checked;
+  
+  // Confirm if shutdown is enabled
+  if (shutdownChecked) {
+    if (!confirm('⚠️ Auto-shutdown is ON.\n\nKomputer akan mati otomatis 2 menit setelah training selesai.\nAnda bisa membatalkan dengan menjalankan "shutdown /a" di terminal.\n\nLanjutkan?')) {
+      return;
+    }
+  }
+  
   const cfg = {
     model: document.getElementById('tr-model').value,
     dataset: document.getElementById('tr-dataset').value,
@@ -1090,6 +1163,7 @@ document.getElementById('btn-train-start').addEventListener('click', async () =>
     batch: Number(document.getElementById('tr-batch').value),
     imgsz: Number(document.getElementById('tr-imgsz').value),
     device: document.getElementById('tr-device').value,
+    shutdown_after: shutdownChecked,
   };
   document.getElementById('tr-metrics-grid').style.display = 'none';
   document.getElementById('tr-trend-container').style.display = 'none';

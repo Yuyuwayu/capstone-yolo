@@ -23,6 +23,7 @@ class YOLOTrainer:
         self.log_buffer = deque(maxlen=500)
         self.latest_metrics = {}
         self.new_model_available = False
+        self.shutdown_after = False
         self._process = None
         self._thread = None
 
@@ -126,6 +127,17 @@ class YOLOTrainer:
         finally:
             self.is_training = False
             self._process = None
+            
+            # Auto-shutdown if requested
+            if self.shutdown_after and self.new_model_available:
+                self.log_buffer.append("[INFO] Training done. Shutting down in 120 seconds...")
+                self.log_buffer.append("[INFO] Run 'shutdown /a' in terminal to cancel.")
+                try:
+                    subprocess.Popen(["shutdown", "/s", "/t", "120", "/c", 
+                        "FishWatch: Training complete. Shutting down in 2 minutes. Run 'shutdown /a' to cancel."])
+                except Exception as e:
+                    self.log_buffer.append(f"[ERROR] Shutdown failed: {e}")
+                self.shutdown_after = False
 
     # ── Status ────────────────────────────────────────
 

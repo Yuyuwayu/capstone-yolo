@@ -332,47 +332,121 @@ async def dataset_upload_images(
     train_ratio: float = 0.8,
     files: list[UploadFile] = File(...)
 ):
-    """Upload images and auto-split into train/val based on ratio."""
+    """Upload images (and optionally labels) and auto-split into train/val based on ratio."""
     import random
+    import os
 
-    train_img_dir, _ = dataset_manager._dirs(name, "train")
-    val_img_dir, _ = dataset_manager._dirs(name, "val")
+    train_img_dir, train_lbl_dir = dataset_manager._dirs(name, "train")
+    val_img_dir, val_lbl_dir = dataset_manager._dirs(name, "val")
     
     if not train_img_dir:
         raise HTTPException(404, f"Dataset '{name}' not found.")
 
     os.makedirs(train_img_dir, exist_ok=True)
     os.makedirs(val_img_dir, exist_ok=True)
+    os.makedirs(train_lbl_dir, exist_ok=True)
+    os.makedirs(val_lbl_dir, exist_ok=True)
 
-    # Read all file data first
-    file_data = []
+    # Collect existing filenames to skip duplicates
+    existing_train = set(os.listdir(train_img_dir))
+    existing_val = set(os.listdir(val_img_dir))
+
+    images_data = {}
+    labels_data = {}
+    pre_split = {}  # stem -> "train" or "val"
+
+    # Group files by stem
     for f in files:
         if not f.filename:
             continue
         data = await f.read()
-        file_data.append((f.filename, data))
+        
+        # Parse path — use forward slashes consistently
+        safe_path = f.filename.replace('\\', '/')
+        parts = safe_path.split('/')
+        
+        # Determine split from folder names (case-insensitive)
+        assigned_split = None
+        for p in parts[:-1]:  # exclude filename itself
+            p_lower = p.lower()
+            if p_lower in ("val", "valid", "validation", "test"):
+                assigned_split = "val"
+                break
+            elif p_lower in ("train", "training"):
+                assigned_split = "train"
+                break
+                
+        # Keep original case for the actual filename
+        basename = parts[-1]
+        ext = os.path.splitext(basename)[1].lower()
+        stem = os.path.splitext(basename)[0]
+        
+        if assigned_split:
+            pre_split[stem] = assigned_split
+            
+        if ext == ".txt":
+            labels_data[stem] = data
+        else:
+            images_data[stem] = (basename, data)
 
-    # Shuffle and split
-    random.shuffle(file_data)
-    split_idx = max(1, int(len(file_data) * train_ratio))
-    train_files = file_data[:split_idx]
-    val_files = file_data[split_idx:] if val_img_dir else []
+    # Shuffle and split image stems
+    stems = list(images_data.keys())
+    if not stems:
+        return {"success": False, "error": "No valid images found to upload."}
+        
+    random.shuffle(stems)
+    
+    # Process splits
+    train_stems = []
+    val_stems = []
+    
+    if pre_split:
+        # Use folder-based split detection
+        for stem in stems:
+            split_choice = pre_split.get(stem, "train")
+            if split_choice == "val":
+                val_stems.append(stem)
+            else:
+                train_stems.append(stem)
+    else:
+        # Fallback to ratio-based split
+        split_idx = max(1, int(len(stems) * train_ratio))
+        train_stems = stems[:split_idx]
+        val_stems = stems[split_idx:]
+
+    skipped = 0
 
     # Save train
-    for fname, data in train_files:
+    for stem in train_stems:
+        fname, data = images_data[stem]
+        if fname in existing_train:
+            skipped += 1
+            continue
         with open(os.path.join(train_img_dir, fname), "wb") as out:
             out.write(data)
+        if stem in labels_data:
+            with open(os.path.join(train_lbl_dir, stem + ".txt"), "wb") as out:
+                out.write(labels_data[stem])
 
     # Save val
-    for fname, data in val_files:
+    for stem in val_stems:
+        fname, data = images_data[stem]
+        if fname in existing_val:
+            skipped += 1
+            continue
         with open(os.path.join(val_img_dir, fname), "wb") as out:
             out.write(data)
+        if stem in labels_data:
+            with open(os.path.join(val_lbl_dir, stem + ".txt"), "wb") as out:
+                out.write(labels_data[stem])
 
+    imported = len(stems) - skipped
     return {
         "success": True,
-        "imported": len(file_data),
-        "train": len(train_files),
-        "val": len(val_files),
+        "imported": imported,
+        "train": len(train_stems),
+        "val": len(val_stems),
+        "skipped": skipped,
         "dataset": name,
     }
 
@@ -410,6 +484,7 @@ class TrainRequest(BaseModel):
     batch: int = 16
     imgsz: int = 640
     device: str = "cpu"
+    shutdown_after: bool = False
 
 
 @app.post("/api/training/start")
@@ -419,6 +494,7 @@ def training_start(req: TrainRequest):
     if not yaml_result.get("success"):
         return {"success": False, "error": yaml_result.get("error", "Failed to generate YAML.")}
 
+    trainer.shutdown_after = req.shutdown_after
     cfg = req.model_dump()
     cfg["data"] = yaml_result["yaml_file"]
     return trainer.start_training(cfg)
