@@ -197,10 +197,11 @@ async function pollMonitor() {
 
     document.getElementById('stat-count').textContent = d.fish_count;
     document.getElementById('stat-dist').textContent = d.avg_distance + ' px';
+    document.getElementById('stat-windowed').textContent = (d.windowed_avg || 0) + ' px';
     document.getElementById('stat-time').textContent = d.timestamp || '—';
 
     if (d.has_frame) {
-      trendData.push(d.avg_distance);
+      trendData.push(d.windowed_avg || d.avg_distance);
       if (trendData.length > 60) trendData.shift();
       drawTrendChart();
     }
@@ -214,7 +215,8 @@ function updateDetectionLog(d) {
   const log = document.getElementById('detection-log');
   const entry = document.createElement('div');
   entry.className = 'entry';
-  entry.innerHTML = `<span class="t-mono">${d.timestamp}</span> — <span style="color:${d.status === 'Lapar' ? 'var(--danger)' : 'var(--tertiary)'}">${d.status}</span> <span class="t-secondary">(${d.avg_distance} px, ${d.fish_count} fish)</span>`;
+  const wAvg = d.windowed_avg || d.avg_distance;
+  entry.innerHTML = `<span class="t-mono">${d.timestamp}</span> — <span style="color:${d.status === 'Lapar' ? 'var(--danger)' : 'var(--tertiary)'}">${d.status}</span> <span class="t-secondary">(avg: ${wAvg} px, ${d.fish_count} fish)</span>`;
   if (log.querySelector('.empty-state')) log.innerHTML = '';
   log.prepend(entry);
   while (log.children.length > 50) log.removeChild(log.lastChild);
@@ -312,9 +314,10 @@ async function captureAndSendFrame() {
 
       document.getElementById('stat-count').textContent = d.fish_count;
       document.getElementById('stat-dist').textContent = d.avg_distance + ' px';
+      document.getElementById('stat-windowed').textContent = (d.windowed_avg || 0) + ' px';
       document.getElementById('stat-time').textContent = d.timestamp;
 
-      trendData.push(d.avg_distance);
+      trendData.push(d.windowed_avg || d.avg_distance);
       if (trendData.length > 60) trendData.shift();
       drawTrendChart();
 
@@ -397,6 +400,16 @@ document.getElementById('slider-conf').addEventListener('change', (e) => {
   fetch(API + '/api/monitor/config', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ confidence_threshold: e.target.value / 100 })
+  });
+});
+
+document.getElementById('slider-smoothing').addEventListener('input', (e) => {
+  document.getElementById('smoothing-val').textContent = e.target.value + 's';
+});
+document.getElementById('slider-smoothing').addEventListener('change', (e) => {
+  fetch(API + '/api/monitor/config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ smoothing_window: Number(e.target.value) })
   });
 });
 

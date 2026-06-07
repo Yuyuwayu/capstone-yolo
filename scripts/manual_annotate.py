@@ -7,8 +7,8 @@ label_dir = 'dataset/labels/train'
 os.makedirs(label_dir, exist_ok=True)
 
 # ==== Konfigurasi Kelas ====
-CLASSES = {0: "ikan", 1: "pakan"}
-COLORS = {0: (0, 255, 0), 1: (0, 0, 255)} # Hijau untuk ikan, Merah untuk pakan
+CLASSES = {0: "ikan"}
+COLORS = {0: (0, 255, 0)} # Hijau untuk ikan
 current_class_id = 0 # Default mulai dari kelas 0 (ikan)
 
 # ==== Global ====
@@ -29,8 +29,7 @@ def print_instructions():
     print("  - Klik Kiri & Tarik : Menggambar kotak (Mode ADD)")
     print("  - Klik Kiri (tepat di kotak) : Menghapus kotak (Mode DELETE)")
     print("\n⌨️  KONTROL KEYBOARD:")
-    print("  [1] : Ganti label aktif menjadi IKAN (Kotak Hijau)")
-    print("  [2] : Ganti label aktif menjadi PAKAN (Kotak Merah)")
+    print("  [1] : Label aktif: IKAN (Kotak Hijau)")
     print("  [h] : Ganti mode (ADD <--> DELETE)")
     print("  [s] : SIMPAN (Save) anotasi & lanjut ke gambar berikutnya")
     print("  [n] : Lanjut ke gambar berikutnya (Tanpa simpan)")
@@ -151,10 +150,7 @@ def semi_auto_annotate():
             # --- Key Bindings ---
             if key == ord('1'):
                 current_class_id = 0
-                print("[*] Label aktif diubah ke: IKAN")
-            elif key == ord('2'):
-                current_class_id = 1
-                print("[*] Label aktif diubah ke: PAKAN")
+                print("[*] Label aktif: IKAN")
             elif key == ord('s'):
                 label_path = os.path.join(label_dir, fname.replace('.jpg', '.txt'))
                 with open(label_path, 'w') as f:

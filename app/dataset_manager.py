@@ -13,8 +13,8 @@ import cv2
 from . import config
 
 
-CLASSES = {0: "ikan", 1: "pakan"}
-COLORS = {0: (178, 186, 60), 1: (60, 186, 93)}  # BGR: teal-ish, green
+CLASSES = {0: "ikan"}
+COLORS = {0: (178, 186, 60)}  # BGR: teal-ish
 
 
 class DatasetManager:
@@ -440,7 +440,7 @@ class DatasetManager:
             
         # Create default classes.txt
         with open(os.path.join(base, "classes.txt"), "w") as f:
-            f.write("ikan\npakan\n")
+            f.write("ikan\n")
             
         return {"success": True, "dataset": name}
         

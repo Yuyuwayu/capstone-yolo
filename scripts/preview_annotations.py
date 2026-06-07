@@ -6,8 +6,8 @@ image_dir = 'dataset/images/val'
 label_dir = 'dataset/labels/val'
 
 # ==== Konfigurasi Kelas ====
-CLASSES = {0: "ikan", 1: "pakan"}
-COLORS = {0: (0, 255, 0), 1: (0, 0, 255)} # Hijau: ikan, Merah: pakan
+CLASSES = {0: "ikan"}
+COLORS = {0: (0, 255, 0)} # Hijau: ikan
 
 def preview_annotations():
     img_files = sorted([f for f in os.listdir(image_dir) if f.endswith('.jpg')])

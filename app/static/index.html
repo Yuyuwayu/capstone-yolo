@@ -112,6 +112,10 @@
               <span class="stat-value" id="stat-dist">—</span>
             </div>
             <div class="stat-row">
+              <span class="stat-label">Windowed Avg</span>
+              <span class="stat-value" id="stat-windowed">—</span>
+            </div>
+            <div class="stat-row">
               <span class="stat-label">Updated</span>
               <span class="stat-value" id="stat-time">—</span>
             </div>
@@ -133,6 +137,13 @@
                   <span class="t-mono t-secondary" id="conf-val">0.50</span>
                 </div>
                 <input type="range" class="slider" id="slider-conf" min="10" max="95" value="50" />
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1">
+                <div class="flex justify-between">
+                  <label class="form-label">Smoothing Window</label>
+                  <span class="t-mono t-secondary" id="smoothing-val">30s</span>
+                </div>
+                <input type="range" class="slider" id="slider-smoothing" min="5" max="120" value="30" step="5" />
               </div>
             </div>
           </div>
@@ -261,7 +272,7 @@
           <p style="font-size:0.8125rem;color:var(--secondary);margin-bottom:var(--sp-md)">Add or remove labels for this dataset. (Comma-separated)</p>
           <div class="flex gap-md items-end flex-wrap">
             <div class="form-group" style="flex:1;min-width:200px">
-              <input class="form-input" id="ds-classes-input" placeholder="e.g. ikan, pakan, predator" />
+              <input class="form-input" id="ds-classes-input" placeholder="e.g. ikan" />
             </div>
             <div style="display:flex;align-items:center;gap:var(--sp-sm)">
               <button class="btn btn-primary btn-sm" id="btn-classes-save">Update Classes</button>

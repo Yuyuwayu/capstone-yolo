@@ -20,6 +20,7 @@ DEFAULT_MODEL_PATH = os.path.join(RUNS_DIR, DEFAULT_MODEL_RUN, "weights", "best.
 DISTANCE_THRESHOLD = 300
 CONFIDENCE_THRESHOLD = 0.5
 HISTORY_LENGTH = 30
+SMOOTHING_WINDOW_SECONDS = 30  # Average distances over this time window (seconds)
 
 # ── Video Source ──────────────────────────────────────
 WEBCAM_INDEX = 1

@@ -1,8 +1,9 @@
 """
 FishWatch — Fish Detector
 
-YOLO-based fish detection with hunger analysis via average inter-fish distance.
-Consolidates logic previously duplicated across main.py, main1.py, final.py, final2.py.
+YOLO-based fish detection with hunger analysis via time-windowed average
+inter-fish distance. Status is determined by averaging distances over a
+configurable time window (default 30 seconds) for stable, flicker-free results.
 """
 
 import os
@@ -23,12 +24,16 @@ class FishDetector:
         self.model = None
         self.distance_threshold = config.DISTANCE_THRESHOLD
         self.confidence_threshold = config.CONFIDENCE_THRESHOLD
-        self.history = deque(maxlen=config.HISTORY_LENGTH)
+        self.smoothing_window = config.SMOOTHING_WINDOW_SECONDS
+
+        # Time-windowed history: stores (timestamp_float, avg_distance) tuples
+        self._distance_history = deque(maxlen=1800)  # ~60s at 30fps
 
         # Latest state (thread-safe via _lock)
         self.latest_frame = None
         self.latest_status = "Unknown"
         self.latest_avg_distance = 0.0
+        self.latest_windowed_avg = 0.0
         self.latest_fish_count = 0
         self.latest_timestamp = ""
 
@@ -55,7 +60,7 @@ class FishDetector:
         with self._lock:
             self.model_path = model_path
             self._load_model()
-            self.history.clear()
+            self._distance_history.clear()
         return self.model is not None
 
     # ── Frame Processing ──────────────────────────────
@@ -79,14 +84,21 @@ class FishDetector:
             cv2.rectangle(frame, (x1, y1), (x2, y2), (178, 186, 60), 2)
 
         avg_dist = self._avg_distance(centroids)
-        status = "Lapar" if avg_dist < self.distance_threshold else "Tidak Lapar"
-        self.history.append(status)
+        now = time.time()
+
+        # Store this frame's distance with timestamp
+        self._distance_history.append((now, avg_dist))
+
+        # Compute windowed average
+        windowed_avg = self._windowed_average(now)
+        status = "Lapar" if windowed_avg < self.distance_threshold else "Tidak Lapar"
 
         return {
             "frame": frame,
             "avg_distance": round(avg_dist, 2),
+            "windowed_avg": round(windowed_avg, 2),
             "status": status,
-            "smoothed_status": self._smoothed_status(),
+            "smoothed_status": status,
             "fish_count": len(centroids),
         }
 
@@ -102,10 +114,14 @@ class FishDetector:
         ]
         return float(np.mean(dists))
 
-    def _smoothed_status(self):
-        if not self.history:
-            return "Unknown"
-        return "Lapar" if self.history.count("Lapar") > len(self.history) // 2 else "Tidak Lapar"
+    def _windowed_average(self, now):
+        """Compute average distance over the smoothing time window."""
+        cutoff = now - self.smoothing_window
+        # Collect distances within the time window
+        window_dists = [d for t, d in self._distance_history if t >= cutoff]
+        if not window_dists:
+            return 9999.0
+        return float(np.mean(window_dists))
 
     # ── Video Stream ──────────────────────────────────
 
@@ -154,6 +170,7 @@ class FishDetector:
                     self.latest_frame = result["frame"].copy()
                     self.latest_status = result["smoothed_status"]
                     self.latest_avg_distance = result["avg_distance"]
+                    self.latest_windowed_avg = result["windowed_avg"]
                     self.latest_fish_count = result["fish_count"]
                     self.latest_timestamp = datetime.now().strftime("%H:%M:%S")
 
@@ -174,6 +191,7 @@ class FishDetector:
             return {
                 "status": self.latest_status,
                 "avg_distance": self.latest_avg_distance,
+                "windowed_avg": self.latest_windowed_avg,
                 "fish_count": self.latest_fish_count,
                 "timestamp": self.latest_timestamp,
                 "has_frame": self.latest_frame is not None,
@@ -185,3 +203,4 @@ class FishDetector:
                 return None
             _, buf = cv2.imencode(".jpg", self.latest_frame)
             return buf.tobytes()
+

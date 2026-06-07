@@ -96,13 +96,14 @@ detection_history = []
 def monitor_status():
     det = _get_detector()
     if det is None:
-        return {"status": "No detector", "avg_distance": 0, "fish_count": 0, "timestamp": "", "has_frame": False}
+        return {"status": "No detector", "avg_distance": 0, "windowed_avg": 0, "fish_count": 0, "timestamp": "", "has_frame": False}
     data = det.get_latest()
     # Append to history
     if data["has_frame"]:
         detection_history.append({
             "status": data["status"],
             "avg_distance": data["avg_distance"],
+            "windowed_avg": data["windowed_avg"],
             "fish_count": data["fish_count"],
             "timestamp": data["timestamp"],
         })
@@ -138,6 +139,7 @@ def monitor_history():
 class MonitorConfig(BaseModel):
     distance_threshold: Optional[float] = None
     confidence_threshold: Optional[float] = None
+    smoothing_window: Optional[int] = None
     source: Optional[str] = None
 
 
@@ -147,6 +149,7 @@ def monitor_config_get():
     return {
         "distance_threshold": det.distance_threshold if det else config.DISTANCE_THRESHOLD,
         "confidence_threshold": det.confidence_threshold if det else config.CONFIDENCE_THRESHOLD,
+        "smoothing_window": det.smoothing_window if det else config.SMOOTHING_WINDOW_SECONDS,
         "source": str(det.source) if det else config.DEFAULT_SOURCE,
         "active_model": model_manager.active_model,
     }
@@ -161,6 +164,8 @@ def monitor_config_set(cfg: MonitorConfig):
         det.distance_threshold = cfg.distance_threshold
     if cfg.confidence_threshold is not None:
         det.confidence_threshold = cfg.confidence_threshold
+    if cfg.smoothing_window is not None:
+        det.smoothing_window = cfg.smoothing_window
     if cfg.source is not None:
         det.stop_stream()
         det.start_stream(cfg.source)
@@ -240,6 +245,7 @@ async def process_frame(file: UploadFile = File(...)):
     detection_history.append({
         "status": result["smoothed_status"],
         "avg_distance": result["avg_distance"],
+        "windowed_avg": result["windowed_avg"],
         "fish_count": result["fish_count"],
         "timestamp": ts,
     })
@@ -250,6 +256,7 @@ async def process_frame(file: UploadFile = File(...)):
         "image": b64,
         "status": result["smoothed_status"],
         "avg_distance": result["avg_distance"],
+        "windowed_avg": result["windowed_avg"],
         "fish_count": result["fish_count"],
         "timestamp": ts,
     }

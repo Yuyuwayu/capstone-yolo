@@ -39,3 +39,6 @@ Thumbs.db
 # generated data
 *.cache
 custom_auto.yaml
+
+# documents
+*.docx
