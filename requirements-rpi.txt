@@ -1,0 +1,16 @@
+# Raspberry Pi runtime requirements.
+#
+# Install torch/torchvision and OpenCV using Raspberry Pi compatible packages first.
+# Do not install the laptop/Windows requirements.txt on Raspberry Pi.
+
+fastapi
+uvicorn
+python-multipart
+ultralytics
+numpy<2.0
+Pillow
+PyYAML
+requests
+psutil
+matplotlib
+scipy

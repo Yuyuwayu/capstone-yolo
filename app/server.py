@@ -195,9 +195,11 @@ def detect_cameras():
     cameras = []
     for i in range(5):
         cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)  # DSHOW is faster on Windows
-        if cap.isOpened():
+        ok = cap.isOpened()
+        ret, _frame = cap.read() if ok else (False, None)
+        if ok and ret:
             cameras.append({"index": i, "name": f"Webcam {i}"})
-            cap.release()
+        cap.release()
     return cameras
 
 
@@ -238,7 +240,11 @@ async def process_frame(file: UploadFile = File(...)):
     if result is None:
         raise HTTPException(500, "Detection failed.")
 
-    _, buf = cv2.imencode(".jpg", result["frame"], [cv2.IMWRITE_JPEG_QUALITY, 80])
+    _, buf = cv2.imencode(
+        ".jpg",
+        result["frame"],
+        [cv2.IMWRITE_JPEG_QUALITY, config.STREAM_JPEG_QUALITY],
+    )
     b64 = base64.b64encode(buf.tobytes()).decode()
 
     ts = datetime.now().strftime("%H:%M:%S")

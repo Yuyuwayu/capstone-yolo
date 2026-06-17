@@ -370,7 +370,15 @@ document.getElementById('btn-stream-start').addEventListener('click', async () =
   }
 
   const source = getSourceValue();
-  await fetch(API + '/api/monitor/start?source=' + encodeURIComponent(source), { method: 'POST' });
+  const res = await fetch(API + '/api/monitor/start?source=' + encodeURIComponent(source), { method: 'POST' });
+  const data = await res.json();
+  if (!data.success) {
+    feed.src = '';
+    feed.style.display = 'none';
+    document.getElementById('video-placeholder').style.display = 'flex';
+    alert('Stream gagal dibuka. Cek index kamera, izin kamera, atau tutup aplikasi lain yang memakai kamera.');
+    return;
+  }
   feed.src = API + '/api/monitor/video_feed?' + Date.now();
 });
 

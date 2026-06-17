@@ -25,6 +25,9 @@ class FishDetector:
         self.distance_threshold = config.DISTANCE_THRESHOLD
         self.confidence_threshold = config.CONFIDENCE_THRESHOLD
         self.smoothing_window = config.SMOOTHING_WINDOW_SECONDS
+        self.inference_image_size = config.INFERENCE_IMAGE_SIZE
+        self.process_every_n_frames = config.PROCESS_EVERY_N_FRAMES
+        self.stream_jpeg_quality = config.STREAM_JPEG_QUALITY
 
         # Time-windowed history: stores (timestamp_float, avg_distance) tuples
         self._distance_history = deque(maxlen=1800)  # ~60s at 30fps
@@ -42,6 +45,7 @@ class FishDetector:
         self.source = None
         self._running = False
         self._thread = None
+        self._frame_counter = 0
 
         self._load_model()
 
@@ -68,9 +72,16 @@ class FishDetector:
     def process_frame(self, frame):
         """Run YOLO on a single frame, compute distances, return results."""
         if self.model is None:
-            return None
+            return {
+                "frame": frame,
+                "avg_distance": 0.0,
+                "windowed_avg": 0.0,
+                "status": "No model",
+                "smoothed_status": "No model",
+                "fish_count": 0,
+            }
 
-        results = self.model(frame, verbose=False)[0]
+        results = self.model(frame, imgsz=self.inference_image_size, verbose=False)[0]
         boxes = results.boxes.xyxy.cpu().numpy()
         confs = results.boxes.conf.cpu().numpy()
 
@@ -143,15 +154,35 @@ class FishDetector:
                 src = candidate
 
         self.source = src
-        self.cap = cv2.VideoCapture(src)
+        self.cap = self._open_capture(src)
 
         if not self.cap.isOpened():
             return False
+
+        self._configure_capture(src)
 
         self._running = True
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
         return True
+
+    @staticmethod
+    def _open_capture(src):
+        """Open camera/video source with Windows-friendly webcam fallback."""
+        if isinstance(src, int):
+            cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                return cap
+            cap.release()
+        return cv2.VideoCapture(src)
+
+    def _configure_capture(self, src):
+        """Request low camera settings when using webcam-like sources."""
+        if not isinstance(src, int) or self.cap is None:
+            return
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+        self.cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
 
     def _loop(self):
         fps = self.cap.get(cv2.CAP_PROP_FPS)
@@ -162,6 +193,16 @@ class FishDetector:
             if not ret:
                 if isinstance(self.source, str):  # video file → loop
                     self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                continue
+
+            self._frame_counter += 1
+            should_process = (
+                self.latest_frame is None
+                or self.process_every_n_frames <= 1
+                or self._frame_counter % self.process_every_n_frames == 0
+            )
+            if not should_process:
+                time.sleep(delay)
                 continue
 
             result = self.process_frame(frame)
@@ -201,6 +242,9 @@ class FishDetector:
         with self._lock:
             if self.latest_frame is None:
                 return None
-            _, buf = cv2.imencode(".jpg", self.latest_frame)
+            _, buf = cv2.imencode(
+                ".jpg",
+                self.latest_frame,
+                [cv2.IMWRITE_JPEG_QUALITY, self.stream_jpeg_quality],
+            )
             return buf.tobytes()
-
