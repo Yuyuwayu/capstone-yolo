@@ -4,6 +4,54 @@
 
 Gunakan Raspberry Pi 4 hanya untuk inference/demo ringan. Training model tetap dilakukan di laptop/PC, lalu file `best.pt` dipakai di Raspberry Pi.
 
+## Runtime headless paling ringan
+
+Mode ini tidak menjalankan FastAPI, dashboard, dataset manager, atau training:
+
+```bash
+source venv/bin/activate
+python rpi_headless.py --source 0
+```
+
+Video file:
+
+```bash
+python rpi_headless.py \
+  --source videos/uji_lapar_wa_075908.mp4 \
+  --loop-video
+```
+
+DroidCam atau kamera laptop berbentuk MJPEG stream:
+
+```bash
+python rpi_headless.py \
+  --source http://10.0.100.99:5000/video
+```
+
+Preset ringan:
+
+```bash
+python rpi_headless.py \
+  --source videos/uji_lapar_wa_075908.mp4 \
+  --imgsz 320 \
+  --conf 0.25 \
+  --frame-skip 3 \
+  --loop-video
+```
+
+Preset hasil mendekati pengujian PC:
+
+```bash
+python rpi_headless.py \
+  --source videos/uji_lapar_wa_075908.mp4 \
+  --imgsz 640 \
+  --conf 0.25 \
+  --frame-skip 3 \
+  --loop-video
+```
+
+Tekan `Ctrl+C` untuk berhenti.
+
 ## Preset ringan
 
 Preset default aplikasi sudah dibuat ringan:
