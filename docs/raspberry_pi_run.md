@@ -30,6 +30,14 @@ pip install --no-cache-dir --no-deps ultralytics
 python -m uvicorn app.server:app --host 0.0.0.0 --port 8000
 ```
 
+Tes seluruh dependency runtime:
+
+```bash
+python -c "import numpy, cv2, scipy, matplotlib, torch, torchvision; print('native packages OK')"
+python -c "import polars, thop; from ultralytics import YOLO; print('YOLO runtime OK')"
+python -c "import fastapi, uvicorn, multipart; print('web runtime OK')"
+```
+
 Buka dari browser:
 
 ```text

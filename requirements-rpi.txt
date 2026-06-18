@@ -16,3 +16,5 @@ requests
 psutil
 packaging
 tqdm
+polars-lts-cpu
+ultralytics-thop

@@ -56,7 +56,7 @@ class EnvChecker:
     def _check_python(self):
         v = sys.version_info
         version = f"{v.major}.{v.minor}.{v.micro}"
-        ok = v.major == 3 and v.minor >= 13
+        ok = v.major == 3 and v.minor >= 9
         return {"version": version, "ok": ok}
 
     def _check_directories(self):
