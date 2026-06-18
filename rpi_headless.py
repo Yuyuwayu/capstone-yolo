@@ -78,6 +78,7 @@ def main():
         raise SystemExit(f"Sumber video gagal dibuka: {source}")
 
     history = deque()
+    inference_times = deque(maxlen=30)
     frame_index = 0
     processed_frames = 0
     last_report = 0.0
@@ -101,7 +102,9 @@ def main():
             if frame_index % max(1, args.frame_skip) != 0:
                 continue
 
+            inference_start = time.perf_counter()
             result = model(frame, imgsz=args.imgsz, conf=args.conf, verbose=False)[0]
+            inference_times.append(time.perf_counter() - inference_start)
             boxes = result.boxes.xyxy.cpu().numpy() if result.boxes is not None else []
             centroids = [
                 ((float(box[0]) + float(box[2])) / 2, (float(box[1]) + float(box[3])) / 2)
@@ -141,10 +144,15 @@ def main():
                 distance_text = "-" if distance is None else f"{distance:.2f}"
                 average_text = "-" if window_average is None else f"{window_average:.2f}"
                 hungry_text = "-" if hungry_percentage is None else f"{hungry_percentage:.1f}%"
+                inference_fps = (
+                    len(inference_times) / sum(inference_times)
+                    if inference_times and sum(inference_times) > 0
+                    else 0.0
+                )
                 print(
                     f"ikan={len(centroids):2d} | d_avg={distance_text:>7} | "
                     f"window={average_text:>7} | lapar={hungry_text:>6} | "
-                    f"status={last_status}"
+                    f"status={last_status} | inferensi={inference_fps:.2f} FPS"
                 )
                 last_report = now
 
