@@ -7,6 +7,7 @@ configurable time window (default 30 seconds) for stable, flicker-free results.
 """
 
 import os
+import platform
 import threading
 import time
 from collections import deque
@@ -168,9 +169,10 @@ class FishDetector:
 
     @staticmethod
     def _open_capture(src):
-        """Open camera/video source with Windows-friendly webcam fallback."""
+        """Open camera/video source with an OS-appropriate camera backend."""
         if isinstance(src, int):
-            cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
+            backend = cv2.CAP_DSHOW if platform.system() == "Windows" else cv2.CAP_V4L2
+            cap = cv2.VideoCapture(src, backend)
             if cap.isOpened():
                 return cap
             cap.release()

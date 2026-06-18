@@ -7,6 +7,7 @@ Run with: uvicorn app.server:app --host 0.0.0.0 --port 8000
 
 import base64
 import os
+import platform
 import time
 
 import cv2
@@ -193,8 +194,9 @@ def monitor_stop():
 def detect_cameras():
     """Auto-detect available webcam indices (probes 0-4)."""
     cameras = []
+    backend = cv2.CAP_DSHOW if platform.system() == "Windows" else cv2.CAP_V4L2
     for i in range(5):
-        cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)  # DSHOW is faster on Windows
+        cap = cv2.VideoCapture(i, backend)
         ok = cap.isOpened()
         ret, _frame = cap.read() if ok else (False, None)
         if ok and ret:
