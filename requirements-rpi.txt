@@ -1,16 +1,18 @@
-# Raspberry Pi runtime requirements.
+# Raspberry Pi application dependencies.
 #
-# Install torch/torchvision and OpenCV using Raspberry Pi compatible packages first.
-# Do not install the laptop/Windows requirements.txt on Raspberry Pi.
+# Install binary packages from apt first:
+# sudo apt install python3-numpy python3-opencv python3-scipy \
+#   python3-matplotlib python3-torch python3-torchvision
+#
+# Install Ultralytics separately without dependencies:
+# pip install --no-cache-dir --no-deps ultralytics
 
 fastapi
 uvicorn
 python-multipart
-ultralytics
-numpy<2.0
 Pillow
 PyYAML
 requests
 psutil
-matplotlib
-scipy
+packaging
+tqdm

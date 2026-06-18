@@ -18,10 +18,15 @@ Preset default aplikasi sudah dibuat ringan:
 
 ```bash
 cd ~/capstone-yolo
+sudo apt update
+sudo apt install -y python3-venv python3-numpy python3-opencv \
+  python3-scipy python3-matplotlib python3-torch python3-torchvision
+
 python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements-rpi.txt
+pip install --no-cache-dir --no-deps ultralytics
 python -m uvicorn app.server:app --host 0.0.0.0 --port 8000
 ```
 
