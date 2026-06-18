@@ -13,6 +13,28 @@ source venv/bin/activate
 python rpi_headless.py --source 0
 ```
 
+Jika Raspberry dibuka lewat VNC, tampilkan video dan bounding box:
+
+```bash
+python rpi_headless.py \
+  --source videos/uji_lapar_wa_075908.mp4 \
+  --imgsz 320 \
+  --conf 0.25 \
+  --frame-skip 3 \
+  --loop-video \
+  --show
+```
+
+Tekan `q` pada jendela video untuk berhenti.
+
+Simpan video hasil bounding box:
+
+```bash
+python rpi_headless.py \
+  --source videos/uji_lapar_wa_075908.mp4 \
+  --output outputs/hasil_deteksi.mp4
+```
+
 Video file:
 
 ```bash
