@@ -98,8 +98,10 @@ class FishDetector:
         avg_dist = self._avg_distance(centroids)
         now = time.time()
 
-        # Store this frame's distance with timestamp
-        self._distance_history.append((now, avg_dist))
+        # Match the validation method: only frames with at least two fish
+        # contribute to distance statistics.
+        if len(centroids) >= 2:
+            self._distance_history.append((now, avg_dist))
 
         # Compute windowed average
         windowed_avg = self._windowed_average(now)

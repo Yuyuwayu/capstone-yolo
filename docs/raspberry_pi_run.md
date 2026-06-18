@@ -10,9 +10,23 @@ Preset default aplikasi sudah dibuat ringan:
 
 - Ukuran inferensi YOLO: `320`
 - Proses setiap 3 frame: `PROCESS_EVERY_N_FRAMES=3`
+- Confidence threshold: `0.25`
 - Resolusi kamera: `640x480`
 - FPS kamera: `10`
 - JPEG quality stream: `65`
+
+## Preset hasil mendekati pengujian PC
+
+Pengujian skripsi di PC menggunakan `imgsz=640`, confidence `0.25`, dan sampling setiap 3 frame. Gunakan preset ini saat menguji video yang sama:
+
+```bash
+export FISHWATCH_INFERENCE_IMAGE_SIZE=640
+export FISHWATCH_PROCESS_EVERY_N_FRAMES=3
+export FISHWATCH_CONFIDENCE_THRESHOLD=0.25
+export FISHWATCH_STREAM_JPEG_QUALITY=70
+```
+
+Pemrosesan akan lebih lambat di Raspberry Pi, tetapi jumlah bounding box dan hasil `d_avg` lebih mendekati pengujian PC.
 
 ## Jalankan di Raspberry Pi
 
@@ -51,6 +65,7 @@ Turunkan lagi setting lewat environment variable:
 ```bash
 export FISHWATCH_INFERENCE_IMAGE_SIZE=256
 export FISHWATCH_PROCESS_EVERY_N_FRAMES=5
+export FISHWATCH_CONFIDENCE_THRESHOLD=0.25
 export FISHWATCH_CAMERA_WIDTH=480
 export FISHWATCH_CAMERA_HEIGHT=360
 export FISHWATCH_CAMERA_FPS=6
